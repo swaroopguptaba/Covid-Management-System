@@ -1,6 +1,6 @@
 SET SERVEROUTPUT ON;
 DECLARE
-ROW_COUNT NUMBER;
+ROW_COUNT NUMBER(10);
 BEGIN
     SELECT count(*) into ROW_COUNT FROM user_tables where table_name = 'CONFIG_TABLE';
     IF(ROW_COUNT > 0)
@@ -10,14 +10,51 @@ BEGIN
         EXECUTE IMMEDIATE 'CREATE TABLE CONFIG_TABLE
     (
        TABLE_NAME varchar2(50), 
-       TABLE_DEF varchar2(1000) NOT NULL, 
+       TABLE_DEF varchar2(3000) NOT NULL, 
        CONSTRAINT CONFIG_TABLE_PK PRIMARY KEY(TABLE_NAME)
     )
     ';    
-     DBMS_OUTPUT.PUT_LINE('TABLE USERS CREATED SUCCESSFULLY');
-     
-     
-     INSERT INTO CONFIG_TABLE VALUES ('USERS','CREATE TABLE USERS
+     DBMS_OUTPUT.PUT_LINE('TABLE CONFIG_TABLE CREATED SUCCESSFULLY');
+    
+    EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('LOCATION','CREATE TABLE LOCATION
+            (	
+            LOCATION_ID NUMBER(10), 
+            CITY VARCHAR2(20) NOT NULL, 
+            STATE VARCHAR2(20) NOT NULL,
+            ZIPCODE NUMBER(10),
+            CONSTRAINT LOCATION_PK PRIMARY KEY(LOCATION_ID)
+            )
+    ')]';
+    
+     EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('GROUPS','CREATE TABLE GROUPS
+            (	
+            GROUPS_ID NUMBER(10), 
+            GROUPS_NAME VARCHAR2(20) NOT NULL, 
+            GROUPS_DESCRIPTION VARCHAR2(20) NOT NULL,
+            CONSTRAINT GROUPS_PK PRIMARY KEY(GROUPS_ID)
+            )
+    ')]';
+    
+      EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('ROLES','CREATE TABLE ROLES
+            (	
+            ROLES_ID NUMBER(10), 
+            ROLES_DESCRIPTION VARCHAR2(20) NOT NULL,
+            CONSTRAINT ROLES_PK PRIMARY KEY(ROLES_ID)
+            )
+    ')]';
+    
+     EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('GROUPS_ROLES','CREATE TABLE GROUPS_ROLES
+            (
+             GROUPS_ROLES_ID NUMBER(10), 
+             GROUPS_ID NUMBER(10), 
+             ROLES_ID NUMBER(10), 
+             CONSTRAINT GROUPS_ROLES_PK PRIMARY KEY(GROUPS_ROLES_ID),
+             CONSTRAINT GROUPS_ROLES_FK_GROUPS FOREIGN KEY (GROUPS_ID) REFERENCES GROUPS(GROUPS_ID),
+             CONSTRAINT GROUPS_ROLES_FK_ROLES FOREIGN KEY (ROLES_ID) REFERENCES ROLES(ROLES_ID) 
+    )
+    ')]';
+    
+     EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('USERS','CREATE TABLE USERS
             (
               USER_ID NUMBER(10)
             , PHONE NUMBER(10)
@@ -37,49 +74,20 @@ BEGIN
             ,  CONSTRAINT USERS_FK_LOCATION FOREIGN KEY (LOCATION_ID) REFERENCES LOCATION(LOCATION_ID)
             ,  CONSTRAINT USERS_FK_GROUPS FOREIGN KEY (GROUPS_ID) REFERENCES GROUPS(GROUPS_ID) 
             )
-     ');
-        
-        
-    INSERT INTO CONFIG_TABLE VALUES ('GROUPS','CREATE TABLE GROUPS
-            (	
-            GROUPS_ID NUMBER(10), 
-            GROUPS_NAME VARCHAR2(20) NOT NULL, 
-            GROUPS_DESCRIPTION VARCHAR2(20) NOT NULL,
-             CONSTRAINT GROUPS_PK PRIMARY KEY(GROUPS_ID)
-    )');
-        
-        
-    INSERT INTO CONFIG_TABLE VALUES ('ROLES','CREATE TABLE ROLES
-            (	
-            ROLES_ID NUMBER(10), 
-            ROLES_DESCRIPTION VARCHAR2(20) NOT NULL,
-             CONSTRAINT ROLES_PK PRIMARY KEY(ROLES_ID)
-    )');
-        
-    INSERT INTO CONFIG_TABLE VALUES ('GROUPS_ROLES','CREATE TABLE GROUPS_ROLES
+       ')]';
+       
+       EXECUTE IMMEDIATE q'[INSERT INTO CONFIG_TABLE VALUES ('USER_LOGIN_AUDIT','CREATE TABLE USER_LOGIN_AUDIT
             (
-             GROUPS_ROLES_ID NUMBER(10), 
-             GROUPS_ID NUMBER(10), 
-             ROLES_ID NUMBER(10), 
-             CONSTRAINT GROUPS_ROLES_PK PRIMARY KEY(GROUPS_ROLES_ID),
-             CONSTRAINT GROUPS_ROLES_FK_GROUPS FOREIGN KEY (GROUPS_ID) REFERENCES GROUPS(GROUPS_ID) 
-             CONSTRAINT GROUPS_ROLES_FK_ROLES FOREIGN KEY (ROLES_ID) REFERENCES ROLES(ROLES_ID) 
-    )');
-        
-        
-    INSERT INTO CONFIG_TABLE VALUES ('USER_LOGIN_AUDIT','CREATE TABLE USER_LOGIN_AUDIT
-            (
-             AUDIT_ID NUMBER(100), 
+             AUDIT_ID NUMBER(10), 
              USER_ID NUMBER(10),
              LOGIN_STATUS VARCHAR2(10) NOT NULL,
              AUDIT_DATE DATE NOT NULL,
              CONSTRAINT USER_LOGIN_AUDIT_PK PRIMARY KEY(AUDIT_ID),
              CONSTRAINT USER_LOGIN_AUDIT_FK_USERS FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID) ,
-             CONSTRAINT USER_LOGIN_AUDIT_LOGIN_STATUS CHECK (LOGIN_STATUS IN ("login","logout")),
-             CONSTRAINT USER_LOGIN_AUDIT_DATE CHECK (AUDIT_DATE <= SYSDATE),
-    )');
-
-
+             CONSTRAINT USER_LOGIN_AUDIT_LOGIN_STATUS CHECK (LOGIN_STATUS IN (''login'',''logout''))
+        )
+      ')]';
+         
     END IF;
 END;
 /
@@ -93,7 +101,7 @@ DECLARE
         config_table;
         
     tab_name varchar2(50);
-    tab_def varchar2(1000);
+    tab_def varchar2(3000);
     row_count number(10):= 0;
 BEGIN
   FOR i IN config_table_cur
@@ -101,15 +109,20 @@ BEGIN
       tab_name:= i.table_name;
       tab_def:= i.table_def;
       
+      DBMS_OUTPUT.PUT_LINE('tab_name -- '|| tab_name);
+      DBMS_OUTPUT.PUT_LINE('--------------------------');
+
       SELECT count(*) into row_count FROM user_tables where table_name = tab_name;
        IF(row_count > 0)
         THEN
-            DBMS_OUTPUT.PUT_LINE('TABLE'||tab_name || 'ALREADY EXISTS');
+            DBMS_OUTPUT.PUT_LINE('TABLE '|| tab_name || ' ALREADY EXISTS');
         ELSE
+            DBMS_OUTPUT.PUT_LINE('--------------------------');  
             EXECUTE IMMEDIATE tab_def;
-            dbms_output.put_line( 'TABLE '||tab_name || 'CREATED SUCCESSFULLY!' );
+            dbms_output.put_line( 'TABLE '|| tab_name || ' CREATED SUCCESSFULLY!' );
          END IF;
   END LOOP;
+  dbms_output.put_line( 'ALL TABLES CREATED');
 END;
 /
 
