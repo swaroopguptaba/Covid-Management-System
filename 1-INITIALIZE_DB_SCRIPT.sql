@@ -739,4 +739,25 @@ EXEC INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
 EXEC INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
 
 
+------------POPULATE GROUP TABLE -------------
+EXEC insertions.add_groups('USERS','Can only be a user and can access test availability table');
+EXEC insertions.add_groups('STAFF','Can access staff timesheet');
+EXEC insertions.add_groups('CENTER_HEAD','Can access test schedule,test center and staff timesheet');
+EXEC insertions.add_groups('DOCTOR','Can access quarantine facitlity and quarentined patient details');
+EXEC insertions.add_groups('ADMIN','Manages all tables');
 
+
+------------POPULATE ROLES TABLE -------------
+EXEC insertions.add_roles('Select test availibility');
+EXEC insertions.add_roles('Select staff timesheet');
+EXEC insertions.add_roles('Select staff timesheet, test schedule,test center');
+EXEC insertions.add_roles('Select quarantine facitlity, quarentined patient details');
+EXEC insertions.add_roles('Select all tables');
+
+
+------------POPULATE GROUP ROLES TABLE -------------
+EXEC insertions.add_group_roles(1,1);
+EXEC insertions.add_group_roles(2,2);
+EXEC insertions.add_group_roles(3,3);
+EXEC insertions.add_group_roles(4,4);
+EXEC insertions.add_group_roles(5,5);
