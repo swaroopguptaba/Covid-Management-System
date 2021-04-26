@@ -435,6 +435,83 @@ AS
         
 END INSERTIONS;
 
+----------------------------------------------------------VIEWS-------------------------------------------------
+ CREATE OR REPLACE VIEW VIEW_QUARANTINE_FACILITY_DETAILS  AS
+    SELECT
+        qf_name,
+        rooms_avail,
+        city,
+        state,
+        zipcode
+    FROM
+             quarantine_facility qf
+        INNER JOIN location l ON qf.location_id = l.location_id;
+
+CREATE OR REPLACE VIEW VIEW_TEST_AVAILANILITY  AS
+    SELECT
+    tc.center_name,
+    slot_name,
+    slot_time,
+    slots_available,
+    tt.test_type
+FROM
+         test_center tc
+    INNER JOIN test_availibilty  ta ON tc.center_id = ta.center_id
+    INNER JOIN slots             s ON ta.slot_id = s.slot_id
+    INNER JOIN test_type         tt ON ta.test_type_id = tt.test_type_id
+WHERE
+        s.slots_available > 0
+    AND s.slot_time > sysdate
+GROUP BY
+    tc.center_name, 
+    slot_time,
+    slot_name,
+    slots_available,
+    tt.test_type
+ORDER BY
+    tc.center_name ASC;
+
+
+ CREATE OR REPLACE FORCE EDITIONABLE VIEW TEST_CENTER_HEAD_VIEW 
+  AS
+    SELECT
+        tc.center_name,
+        pu.first_name || pu.last_name AS "Name",
+        pu.user_id
+    FROM
+             test_center tc
+        JOIN users          u ON tc.center_head = u.user_id
+        JOIN users          pu ON tc.center_head != pu.user_id
+        JOIN test_schedule  ts ON pu.user_id = ts.user_id
+                                 AND ts.center_id = tc.center_id
+        JOIN test_type      tp ON tp.test_type_id = ts.test_type_id
+        JOIN slots          s ON ts.test_slot_id = s.slot_id
+    WHERE
+        tc.center_head = 1;
+
+
+ CREATE OR REPLACE VIEW QUARANTINE_FACILITY_HEAD_VIEW
+ AS 
+            select 
+            qf.qf_name, pu.first_name || pu.last_name AS "Name", pu.user_id, (sysdate - pu.join_date) AS "NO OF DAYS IN QUARANTINE"
+            from quarantine_facility qf
+            join quarantined_patient_details qp on qf.qf_id = qp.qf_id
+            join users u on qf.doctor_id = u.user_id
+            join users pu on qp.user_id = pu.user_id
+            where  qf.doctor_id = 2;
+            
+   
+ CREATE OR REPLACE VIEW TEST_STATISTICS
+ AS          
+ SELECT 
+    TC.CENTER_NAME, L.CITY, COUNT(TS.TEST_SCHEDULE_ID) AS "NO. OF TESTS CONDUCTED",
+    CASE WHEN (TS.TEST_RESULTS = 'POSITIVE') THEN COUNT(TS.TEST_SCHEDULE_ID) END  "POSITIVE CASES" 
+ FROM
+ TEST_SCHEDULE TS
+ JOIN TEST_CENTER TC ON TS.CENTER_ID = TC.CENTER_ID
+ JOIN LOCATION L ON TC.LOCATION_ID = L.LOCATION_ID
+ GROUP BY TC.CENTER_NAME, L.CITY;
+
 
 
 EXECUTE INITIALIZE_OPERATIONS.CREATE_CONFIG_TABLE;
