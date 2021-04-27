@@ -182,8 +182,12 @@ BEGIN
       ')]';
          
     END IF;
-    
-    DECLARE
+      
+END;
+/
+
+
+DECLARE
         CURSOR config_table_cur
       IS
         SELECT 
@@ -214,10 +218,7 @@ BEGIN
       END LOOP;
       dbms_output.put_line( 'ALL TABLES CREATED');
       END;
-      
-END;
-/
-
+/      
 CREATE OR REPLACE PACKAGE INSERTIONS
     AS
         PROCEDURE ADD_LOCATION(L_CITY IN VARCHAR2, L_STATE IN VARCHAR2, L_ZIPCODE IN NUMBER);
@@ -234,7 +235,7 @@ CREATE OR REPLACE PACKAGE INSERTIONS
         PROCEDURE ADD_SLOTS(S_NAME IN VARCHAR2, S_TIME IN TIMESTAMP, S_AVAILABLE IN NUMBER);
         PROCEDURE ADD_TEST_TYPE(T_TEST_TYPE VARCHAR2);
         PROCEDURE ADD_USER_LOGIN_AUDIT(U_USER_ID IN NUMBER, U_LOGIN_STATUS IN VARCHAR2, U_AUDIT_DATE IN DATE);
-        PROCEDURE ADD_TEST_SCHEDULE(TS_USER_ID IN NUMBER,TS_DATE DATE,TS_SLOT_ID NUMBER, TS_CENTER_ID NUMBER, TS_TEST_TYPE_ID NUMBER, TS_SCHEDULE_STATUS VARCHAR2);
+        PROCEDURE ADD_TEST_SCHEDULE(TS_USER_ID IN NUMBER,TS_DATE DATE,TS_SLOT_ID NUMBER, TS_CENTER_ID NUMBER, TS_TEST_TYPE_ID NUMBER, TS_SCHEDULE_STATUS VARCHAR2, TS_TEST_RESULTS VARCHAR2);
     
     END INSERTIONS;
 /
@@ -446,7 +447,8 @@ AS
     END ADD_USER_LOGIN_AUDIT;
     
     
-    PROCEDURE ADD_TEST_SCHEDULE(TS_USER_ID IN NUMBER,TS_DATE DATE,TS_SLOT_ID NUMBER, TS_CENTER_ID NUMBER, TS_TEST_TYPE_ID NUMBER, TS_SCHEDULE_STATUS VARCHAR2)
+    PROCEDURE ADD_TEST_SCHEDULE(TS_USER_ID NUMBER,TS_DATE DATE,TS_SLOT_ID NUMBER, TS_CENTER_ID NUMBER,
+            TS_TEST_TYPE_ID NUMBER, TS_SCHEDULE_STATUS VARCHAR2, TS_TEST_RESULTS VARCHAR2)
     AS
     MERGE_STMT_SQL VARCHAR2(1000);
     USING_STMT VARCHAR2(1000);
@@ -454,13 +456,17 @@ AS
         USING_STMT:= '(SELECT ' || TS_USER_ID || ' AS USER_ID, '||chr(39) ||TS_DATE ||chr(39)|| ' AS TEST_DATE,'
                         || TS_SLOT_ID ||' AS TEST_SLOT_ID, ' 
                         || TS_CENTER_ID || ' AS CENTER_ID,' || TS_TEST_TYPE_ID || ' AS TEST_TYPE_ID,'
-                        || chr(39) || TS_SCHEDULE_STATUS || chr(39) || ' AS SCHEDULE_STATUS ' || 'FROM DUAL)';
-    
+                        || chr(39) || TS_SCHEDULE_STATUS || chr(39) || ' AS SCHEDULE_STATUS, ' 
+                        || chr(39) || TS_TEST_RESULTS || chr(39) || ' AS TEST_RESULTS ' 
+                        || 'FROM DUAL)';
+
         MERGE_STMT_SQL:= 'MERGE INTO TEST_SCHEDULE TS USING ' || USING_STMT || 'TEMP ON (TS.USER_ID =  TEMP.USER_ID 
                    AND TS.TEST_DATE =  TEMP.TEST_DATE AND TS.TEST_SLOT_ID =  TEMP.TEST_SLOT_ID AND TS.CENTER_ID = TEMP.CENTER_ID 
                    AND TS.TEST_TYPE_ID = TEMP.TEST_TYPE_ID AND TS.SCHEDULE_STATUS =TEMP.SCHEDULE_STATUS)
-                            WHEN NOT MATCHED THEN INSERT (USER_ID, TEST_DATE,TEST_SLOT_ID, CENTER_ID,TEST_TYPE_ID, SCHEDULE_STATUS) 
-                           VALUES (TEMP.USER_ID, TEMP.TEST_DATE, TEMP.TEST_SLOT_ID, TEMP.CENTER_ID, TEMP.TEST_TYPE_ID, TEMP.SCHEDULE_STATUS )';
+                            WHEN NOT MATCHED THEN INSERT (USER_ID, TEST_DATE,TEST_SLOT_ID, CENTER_ID,TEST_TYPE_ID, SCHEDULE_STATUS, TEST_RESULTS) 
+                           VALUES (TEMP.USER_ID, TEMP.TEST_DATE, TEMP.TEST_SLOT_ID, TEMP.CENTER_ID, TEMP.TEST_TYPE_ID, TEMP.SCHEDULE_STATUS, TEMP.TEST_RESULTS )';
+                           
+
         EXECUTE IMMEDIATE MERGE_STMT_SQL;
         COMMIT;
         EXCEPTION
@@ -652,12 +658,12 @@ BEGIN
  insertions.add_group_roles(5,5);
 
 ---------POPULATE TEST SCHEDULE-------------
- INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled');
- INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled');
- INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled');
- INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,4,2,1,'scheduled');
- INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,5,3,2,'scheduled');
- INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,6,4,1,'scheduled');
+ INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled','negative');
+ INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled','negative');
+ INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled','negative');
+ INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,2,1,'scheduled','positive');
+ INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,3,2,'scheduled','positive');
+ INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,4,1,'scheduled','positive');
    
 --------POPULATE USER_LOGIN_AUDIT------------------
  INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'login',sysdate);
@@ -706,23 +712,6 @@ ORDER BY
     tc.center_name ASC;
 
 
- CREATE OR REPLACE VIEW TEST_CENTER_HEAD_VIEW 
-  AS
-    SELECT
-        tc.center_name,
-        pu.first_name || pu.last_name AS "Name",
-        pu.user_id
-    FROM
-             test_center tc
-        JOIN users          u ON tc.center_head = u.user_id
-        JOIN users          pu ON tc.center_head != pu.user_id
-        JOIN test_schedule  ts ON pu.user_id = ts.user_id
-                                 AND ts.center_id = tc.test_center_id
-        JOIN test_type      tp ON tp.test_type_id = ts.test_type_id
-        JOIN slots          s ON ts.test_slot_id = s.slot_id
-    WHERE
-        tc.center_head = 1;
-
  CREATE OR REPLACE VIEW QUARANTINE_FACILITY_HEAD_VIEW
  AS 
             select 
@@ -733,8 +722,23 @@ ORDER BY
             join users u on qf.doctor_id = u.user_id
             join users pu on qp.user_id = pu.user_id
             where  qf.doctor_id = 2;
-            
+
+ CREATE OR REPLACE VIEW TEST_STATISTICS
+ AS         
+ (
+ SELECT     
+    TC.CENTER_NAME, L.CITY, COUNT(TS.TEST_SCHEDULE_ID) AS "NO. OF TESTS CONDUCTED"
+ FROM
+ TEST_SCHEDULE TS
+ JOIN TEST_CENTER TC ON TS.CENTER_ID = TC.TEST_CENTER_ID
+ JOIN LOCATION L ON TC.LOCATION_ID = L.LOCATION_ID
+ GROUP BY TC.CENTER_NAME, L.CITY)
+ ;
+
 SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
 SELECT * FROM VIEW_TEST_AVAILABILITY;
-SELECT * FROM TEST_CENTER_HEAD_VIEW;
 SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
+select * from TEST_STATISTICS;
+
+
+
