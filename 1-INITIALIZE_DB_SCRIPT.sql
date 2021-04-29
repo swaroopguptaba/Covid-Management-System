@@ -187,7 +187,6 @@ BEGIN
 END;
 /
 
-
 DECLARE
         CURSOR config_table_cur
       IS
@@ -302,7 +301,7 @@ CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, us
 /
 CREATE OR REPLACE PROCEDURE SELF_DESTRUCT_OBJECTS
 AS
-  CURSOR config_table_cur
+  CURSOR destruct_cur
   IS
     SELECT 
         OBJECT_NAME, OBJECT_TYPE
@@ -314,7 +313,7 @@ AS
     drop_sql varchar2(100);
     row_count number(10):= 0;
 BEGIN
-  FOR i IN config_table_cur
+  FOR i IN destruct_cur
   LOOP
         dbms_output.put_line( I.OBJECT_TYPE);
         IF(I.OBJECT_TYPE = 'TABLE' ) THEN
@@ -333,9 +332,7 @@ BEGIN
             drop_sql:= 'DROP SYNONYM  ' || I.OBJECT_NAME; 
         ELSIF (I.OBJECT_TYPE = 'TRIGGER') THEN 
             drop_sql:= 'DROP TRIGGER  ' || I.OBJECT_NAME; 
-        ELSIF (I.OBJECT_TYPE = 'SEQUENCE') THEN 
-           CONTINUE; 
-        ELSIF (I.OBJECT_TYPE = 'INDEX') THEN 
+        ELSE
             CONTINUE;
          END IF;
           EXECUTE IMMEDIATE drop_sql;
@@ -344,32 +341,6 @@ BEGIN
 END SELF_DESTRUCT_OBJECTS;
 /
 
-CREATE OR REPLACE PROCEDURE SELF_DESTRUCT_VIEWS
-AS
-  CURSOR VIEW_CUR
-  IS
-    SELECT 
-        *
-    FROM 
-        USER_VIEWS;
-        
-    L_VIEW_NAME varchar2(50);
-BEGIN
-  FOR i IN VIEW_CUR
-  LOOP
-     
-        drop_sql:= 'DROP TABLE ' || tab_name || ' CASCADE CONSTRAINTS PURGE'; 
-        EXECUTE IMMEDIATE drop_sql;
-        DBMS_OUTPUT.PUT_LINE('TABLE '|| tab_name || ' DROPPED');
-
-  END LOOP;
-  EXECUTE IMMEDIATE 'DROP TABLE CONFIG_TABLE';
-  dbms_output.put_line( 'ALL TABLES DROPPED AND PURGED');
-END SELF_DESTRUCT_TABLES;
-/
-
-
-SELECT * FROM USER_OBJECTS;
 
 CREATE OR REPLACE PACKAGE INSERTIONS
     AS
@@ -535,11 +506,22 @@ AS
             
         END ADD_QUARANTINED_PATIENT_DETAILS;
         
-    PROCEDURE ADD_SLOTS(S_NAME IN VARCHAR2, S_TIME IN TIMESTAMP, S_AVAILABLE IN NUMBER)
+ PROCEDURE ADD_SLOTS(S_NAME IN VARCHAR2, S_TIME IN TIMESTAMP, S_AVAILABLE IN NUMBER)
     AS
-    BEGIN 
-        EXECUTE IMMEDIATE 'INSERT INTO SLOTS (SLOT_NAME, SLOT_TIME, SLOTS_AVAILABLE) VALUES (' || S_NAME || S_TIME || S_AVAILABLE || ')';
+    MERGE_STMT_SQL VARCHAR2(500);
+    USING_STMT VARCHAR2(500);
+    BEGIN  
+        USING_STMT:= '(SELECT ' || chr(39) || S_NAME || chr(39) || ' AS SLOT_NAME, '
+                        || chr(39) || S_TIME || chr(39) || ' AS SLOT_TIME, '
+                        || S_AVAILABLE || ' AS SLOTS_AVAILABLE '
+                        || ' FROM DUAL)';
+        
+        MERGE_STMT_SQL:= 'MERGE INTO SLOTS S USING ' || USING_STMT || 'TEMP ON (1=2)
+                            WHEN NOT MATCHED THEN INSERT (SLOT_NAME, SLOT_TIME, SLOTS_AVAILABLE) 
+                           VALUES (TEMP.SLOT_NAME, TEMP.SLOT_TIME, TEMP.SLOTS_AVAILABLE)';
+                           
     
+        EXECUTE IMMEDIATE MERGE_STMT_SQL;
         COMMIT;
         EXCEPTION
         WHEN OTHERS THEN
@@ -661,7 +643,7 @@ AS
 END INSERTIONS;
 /
 
---HELP TO NEW_CUSTOMERS
+--HELP TO NEW_USER
 CREATE OR REPLACE PROCEDURE SUPPORT_NEW_USER
 AS
 BEGIN
@@ -694,37 +676,31 @@ BEGIN
         
         dbms_output.put_line('AVAILABLE COMMON ACTIONS');
         dbms_output.put_line('------------- IF YOU ARE A PUBLIC USER -------------');
-        dbms_output.put_line('1. BOOK TEST USING EXEC BOOK_TEST(CENTER_NAME, SLOT_TIME, TEST_TYPE)');
-        dbms_output.put_line('2. CANCEL TEST USING EXEC CANCEL_TEST(BOOKED SLOT_TIME)');
-        dbms_output.put_line('3. VIEW TEST RESULTS USING SELECT * FROM MY_TEST_RESULTS');
+        dbms_output.put_line('1. VIEW TEST aAVILABILITY USING SELECT * FROM VIEW_TEST_AVAILABILITY');
+        dbms_output.put_line('2. BOOK TEST USING EXEC BOOK_TEST(CENTER_NAME, SLOT_TIME, TEST_TYPE)');
+        dbms_output.put_line('3. CANCEL TEST USING EXEC CANCEL_TEST(BOOKED SLOT_TIME)');
+        dbms_output.put_line('4. VIEW TEST RESULTS USING SELECT * FROM MY_TEST_RESULTS');
         
         dbms_output.put_line('------------- IF YOU ARE A STAFF_MEMBER -------------');
-        dbms_output.put_line('1. VIEW AVAILABLE SLOTS USING SELECT * FROM STAFF_SLOTS');
-        dbms_output.put_line('2. LOGIN USING STAFF_LOGIN(CENTER_NAME, SLOT_TIME)');
+        dbms_output.put_line('1. VIEW AVAILABLE SLOTS USING SELECT * FROM VIEW_STAFF_SLOTS');
+        dbms_output.put_line('2. LOGIN USING EXEC STAFF_LOGIN_PROC (CENTER_NAME, SLOT_TIME)');
         
         dbms_output.put_line('------------- IF YOU ARE A CENTER HEAD -------------');
-        dbms_output.put_line('1. REFER TO OUR SERVICE LOCATIONS USING SELECT * FROM AVAILABLE_LOCAITONS');
-        dbms_output.put_line('2. REFER TO OUR SERVICE LOCATIONS BY STATE USING SELECT * FROM ADDRESS_STATE');
+        dbms_output.put_line('1. VIEW ALL RESULTS UNDERS YOUR SUPERVISION USING SELECT * FROM CENTER_RESULTS');
+        dbms_output.put_line('2. PUBLISH TEST RESULTS OF INDIVIDUAL USING PUBLISH_TEST_RESULTS (TEST_SCHEDULE_ID, TEST_RESULTS)');
         
         dbms_output.put_line('------------- IF YOU ARE A QUARANTINE FACILITY HEAD -------------');
-        dbms_output.put_line('1. VIEW THE RENTAL BASIS THAT OUR SERVICE SUPPORTS USING SELECT * FROM RENTAL_BASIS ');
-        dbms_output.put_line('2. VIEW THE CATEGORIES IN WHICH WE OFFER RENTAL SERVICES USING SELECT * FROM LISTING_CATEGORY');
-        dbms_output.put_line('3. ADD A NEW LISTING USING ADD_NEW_LISTING(LISTING_TITLE varchar,LISTING_DESCRIPTION varchar,LISTING_PRICE varchar,CONTACT_INFO varchar,RENT_BASIS varchar,ITEM_CATEGORY varchar,MY_ADDRESS_ID number,START_TIME timestamp,END_TIME timestamp)');
-        dbms_output.put_line('4. REMOVE A LISTING USING REMOVE_LISTING(MY_LISTING_ID number) ');
+         dbms_output.put_line('1. VIEW ALL RESULTS UNDERS YOUR SUPERVISION USING SELECT * FROM MY_QUARANTINE_FACILITY_DETAILS');
+        dbms_output.put_line('2. PUBLISH TEST RESULTS OF INDIVIDUAL USING DISCHARGE_PATIENTS (QUARANTINED_PATIENT_ID, DISCHARGE_DATE)');
         dbms_output.put_line('');
         
-        dbms_output.put_line('-------------DEALS RELATED ACTIONS-------------');
-        dbms_output.put_line('1. ');
-        dbms_output.put_line('2. VIEW THE CATEGORIES IN WHICH WE OFFER RENTAL SERVICES USING SELECT * FROM LISTING_CATEGORY');
-        dbms_output.put_line('3. ADD A NEW LISTING USING ADD_NEW_LISTING(LISTING_TITLE varchar,LISTING_DESCRIPTION varchar,LISTING_PRICE varchar,CONTACT_INFO varchar,RENT_BASIS varchar,ITEM_CATEGORY varchar,MY_ADDRESS_ID number,START_TIME timestamp,END_TIME timestamp)');
-        dbms_output.put_line('4. REMOVE A LISTING USING REMOVE_LISTING(MY_LISTING_ID number) ');
+
         dbms_output.put_line('');
         
 EXCEPTION
     WHEN OTHERS THEN
         dbms_output.put_line(SQLERRM);
-        dbms_output.put_line(dbms_utility.format_error_backtrace);
-        ROLLBACK;
+    
 END MY_ACTIONS;
 
 /
@@ -742,8 +718,6 @@ BEGIN
     RETURN L_USER_ID;
 END;
 /
-
-
 
 CREATE OR REPLACE PROCEDURE staff_login (
     center_name1  NUMBER,
@@ -937,8 +911,8 @@ BEGIN
     
     SELECT RISK_STATUS INTO RISK_COUNT FROM USERS WHERE USER_ID = GET_LOGGEDIN_USER_ID;
     IF (RISK_COUNT > 0) THEN
-          dbms_output.put_line("YOU MAY HAVE BEEN IN CONTACT WITH A COVID POSITIVE PERSON");
-          dbms_output.put_line("YOU ARE ADVISED TO TAKE A COVID TEST");
+          dbms_output.put_line('YOU MAY HAVE BEEN IN CONTACT WITH A COVID POSITIVE PERSON');
+          dbms_output.put_line('YOU ARE ADVISED TO TAKE A COVID TEST');
     END IF;
 END;
 /
@@ -994,13 +968,13 @@ FOR EACH ROW DECLARE
     PRAGMA autonomous_transaction;
     CURSOR staff_user_list IS
     SELECT
-        u.user_id 
+        st.user_id 
     FROM
-             test_schedule ts
+        test_schedule ts
         JOIN staff_timesheet  st ON ts.test_slot_id = st.slot_id
-        JOIN users            u ON st.user_id = u.user_id
+        JOIN slots  s ON s.slot_id = ts.test_slot_id 
     WHERE
-        ts.user_id = :old.user_id;
+        ts.user_id = :old.user_id and ts.test_schedule_id = :old.test_schedule_id;
 BEGIN
     FOR i IN staff_user_list LOOP
         dbms_output.put_line('--------------------------');
@@ -1027,9 +1001,10 @@ END;
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_LOGIN_PROC FOR ADMIN.STAFF_LOGIN';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM CENTER_RESULTS FOR ADMIN.TEST_CENTER_HEAD_VIEW';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM PUBLISH_TEST_RESULTS FOR ADMIN.PUBLISH_RESULTS'; 
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM MY_QUARANTINE_FACILITY_DETAILS FOR ADMIN.VIEW_QUARANTINE_FACILITY_DETAILS'; 
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM DISCHARGE_PATIENTS FOR ADMIN.discharge_patient'; 
 END;
-
+/
 
 
 BEGIN
@@ -1053,14 +1028,17 @@ BEGIN
     insertions.add_roles('CREATE SESSION');
     insertions.add_roles('SELECT ON LOCATIONS');
     insertions.add_roles('EXECUTE ANY PROCEDURE');
-    insertions.add_roles('SELECT ANY VIEW');
-    insertions.add_roles('SELECT STAFF_SLOTS');
-    insertions.add_roles('EXECUTE STAFF_LOGIN');
-    insertions.add_roles('EXECUTE INSERTIONS.ADD_SLOTS');
-    insertions.add_roles('SELECT CENTER_RESULTS');
-    insertions.add_roles('EXECUTE PUBLISH_RESULTS');
-    insertions.add_roles('SELECT VIEW_QUARANTINE_FACILITY_DETAILS');
-    insertions.add_roles('EXECUTE DISCHARGE_PATIENTS');
+    insertions.add_roles('SELECT ON  VIEW_TEST_AVAILABILITY');
+    insertions.add_roles('SELECT ON  MY_TEST_RESULTS');
+    
+    insertions.add_roles('SELECT ON ADMIN.STAFF_SLOTS');
+    insertions.add_roles('EXECUTE ON ADMIN.STAFF_LOGIN');
+
+    insertions.add_roles('SELECT ON ADMIN.CENTER_RESULTS');
+    insertions.add_roles('EXECUTE ON ADMIN.PUBLISH_RESULTS');
+    
+    insertions.add_roles('SELECT ON ADMIN.VIEW_QUARANTINE_FACILITY_DETAILS');
+    insertions.add_roles('EXECUTE ON ADMIN.DISCHARGE_PATIENTS');
     
     ------------POPULATE GROUP ROLES TABLE -------------
     --insertions.add_group_roles((SELECT GROUPS_ID FROM GROUPS WHERE GROUPS_NAME = 'STAFF'),1);
@@ -1068,17 +1046,16 @@ BEGIN
     insertions.add_group_roles(1,2);
     insertions.add_group_roles(1,3);
     insertions.add_group_roles(1,4);
+    insertions.add_group_roles(1,5);
     --STAFF
-    insertions.add_group_roles(2,5);
     insertions.add_group_roles(2,6);
+    insertions.add_group_roles(2,7);
     --CENTER HEAD
-    insertions.add_group_roles(3,7);
     insertions.add_group_roles(3,8);
     insertions.add_group_roles(3,9);
     --QF HEAD
     insertions.add_group_roles(4,10);
     insertions.add_group_roles(4,11);
-    --insertions.add_group_roles(4,9);
     
     ------------POPULATE USERS TABLE -------------
     
@@ -1160,16 +1137,9 @@ END;
 /
 
 
-
-
-
 --SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
 --SELECT * FROM VIEW_TEST_AVAILABILITY;
 --SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
 --select * from TEST_STATISTICS;
 --select * from VIEW_LOCATIONS;
 --select * from STAFF_VIEW;
-
-
-
-
