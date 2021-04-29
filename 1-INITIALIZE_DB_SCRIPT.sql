@@ -598,110 +598,110 @@ END INSERTIONS;
 /
 
 BEGIN
-  INSERTIONS.ADD_LOCATION('BOSTON','MA',02215);
- INSERTIONS.ADD_LOCATION('NEW YORK','NY',10001);
- INSERTIONS.ADD_LOCATION('CAMBRIDGE','MA',02114);
- INSERTIONS.ADD_LOCATION('LOWELL','MA',01850);
- INSERTIONS.ADD_LOCATION('SAN JOSE','CA',95119);
- INSERTIONS.ADD_LOCATION('SAN FRANCISCO','CA',94105);
- INSERTIONS.ADD_LOCATION('LOS ANGELES','CA',90001);
-
-------------POPULATE GROUP TABLE -------------
- insertions.add_groups('USERS','Can access USERS AND test availability table');
- insertions.add_groups('STAFF','Can access staff timesheet');
- insertions.add_groups('CENTER_HEAD','Can access test schedule,test center and staff timesheet');
- insertions.add_groups('DOCTOR','Can access quarantine facitlity and quarentined patient details');
- insertions.add_groups('ADMIN','Manages all tables');
-
-
-------------POPULATE ROLES TABLE -------------
- insertions.add_roles('Select test availibility');
- insertions.add_roles('Select staff timesheet');
- insertions.add_roles('Select staff timesheet, test schedule,test center');
- insertions.add_roles('Select quarantine facitlity, quarentined patient details');
- insertions.add_roles('Select all tables');
-
-------------POPULATE USERS TABLE -------------
-
- INSERTIONS.SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd@123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'PALANI');
- INSERTIONS.SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd@123456789',6174601757, 'BOSTON', 'MA', 02215, 'PALANI');
- INSERTIONS.SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd@123456789',6171234560, 'NEW YORK', 'NY', 10001, 'PALANI');
-
-------------POPULATE TEST CENTER TABLE -------------
- INSERTIONS.ADD_TEST_CENTER('SAINT MARY',1,1);
- INSERTIONS.ADD_TEST_CENTER('AFC URGENT CARE',2,2);
- INSERTIONS.ADD_TEST_CENTER('CAREWELL URGENT CARE',3,3);
- INSERTIONS.ADD_TEST_CENTER('RITE AID',4,1);
- INSERTIONS.ADD_TEST_CENTER('TILTON VA CLINIC',5,2);
- INSERTIONS.ADD_TEST_CENTER('CVS',6,3);
-
--------POPULATE SLOTS---------------
- INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 09', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 10', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 11', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 12', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 14', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 15', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 16', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 17', 'DD-MON-YY HH24'),10);
- INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 18', 'DD-MON-YY HH24'),10);
-
-
-------------POPULATE TEST TYPE TABLE -------------
- INSERTIONS.ADD_TEST_TYPE ('COVID - PCR');
- INSERTIONS.ADD_TEST_TYPE ('COVID - RT PCR');
- INSERTIONS.ADD_TEST_TYPE ('COVID - ANTIGEN');
-
-------------POPULATE TEST_AVAILABILITY TABLE -------------
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 1, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 2, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 3, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 4, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 5, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(1, 6, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(2, 7, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(2, 8, 1);
- INSERTIONS.ADD_TEST_AVAILABILITY(2, 9, 1);
-
-------------POPULATE STAFF TIMESHEET TABLE -------------
- INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 1);
- INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 2);
- INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
- INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
-
-------------POPULATE QUARANTINE FACILITY--------------------
- INSERTIONS.ADD_QUARANTINE_FACILITY('Boston Quarantine Station',20,1,1);
- INSERTIONS.ADD_QUARANTINE_FACILITY('CHA Cambridge Hospital',20,2,2);
- INSERTIONS.ADD_QUARANTINE_FACILITY('Baltimore Isolation Center',20,3,3);
-
-------POPULATE QUARANTINED PATIENT DETAILS----------------------
-
- INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,1,sysdate+2);
- INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,2,sysdate+3);
- INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(2,3,sysdate+4);
-
-------------POPULATE GROUP ROLES TABLE -------------
- insertions.add_group_roles(1,1);
- insertions.add_group_roles(2,2);
- insertions.add_group_roles(3,3);
- insertions.add_group_roles(4,4);
- insertions.add_group_roles(5,5);
-
----------POPULATE TEST SCHEDULE-------------
- INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled','negative');
- INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled','negative');
- INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled','negative');
- INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,2,1,'scheduled','positive');
- INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,3,2,'scheduled','positive');
- INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,4,1,'scheduled','positive');
-   
---------POPULATE USER_LOGIN_AUDIT------------------
- INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'login',sysdate);
- INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'login',sysdate);
- INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'login',sysdate);
- INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'logout',sysdate);
- INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'logout',sysdate);
- INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'logout',sysdate);
+    INSERTIONS.ADD_LOCATION('BOSTON','MA',02215);
+    INSERTIONS.ADD_LOCATION('NEW YORK','NY',10001);
+    INSERTIONS.ADD_LOCATION('CAMBRIDGE','MA',02114);
+    INSERTIONS.ADD_LOCATION('LOWELL','MA',01850);
+    INSERTIONS.ADD_LOCATION('SAN JOSE','CA',95119);
+    INSERTIONS.ADD_LOCATION('SAN FRANCISCO','CA',94105);
+    INSERTIONS.ADD_LOCATION('LOS ANGELES','CA',90001);
+    
+    ------------POPULATE GROUP TABLE -------------
+    insertions.add_groups('USERS','Can access USERS AND test availability table');
+    insertions.add_groups('STAFF','Can access staff timesheet');
+    insertions.add_groups('CENTER_HEAD','Can access test schedule,test center and staff timesheet');
+    insertions.add_groups('DOCTOR','Can access quarantine facitlity and quarentined patient details');
+    insertions.add_groups('ADMIN','Manages all tables');
+    
+    
+    ------------POPULATE ROLES TABLE -------------
+    insertions.add_roles('SELECT STAFF_SLOTS');
+    insertions.add_roles('EXECUTE STAFF_LOGIN');
+    insertions.add_roles('SELECT CENTER_RESULTS');
+    insertions.add_roles('EXECUTE PUBLISH_RESULTS');
+    
+    ------------POPULATE GROUP ROLES TABLE -------------
+    --insertions.add_group_roles((SELECT GROUPS_ID FROM GROUPS WHERE GROUPS_NAME = 'STAFF'),1);
+    insertions.add_group_roles(2,1);
+    insertions.add_group_roles(2,2);
+    insertions.add_group_roles(3,3);
+    insertions.add_group_roles(3,4);
+    
+    ------------POPULATE USERS TABLE -------------
+    
+    INSERTIONS.SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd@123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'PALANI');
+    INSERTIONS.SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd@123456789',6174601757, 'BOSTON', 'MA', 02215, 'PALANI');
+    INSERTIONS.SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd@123456789',6171234560, 'NEW YORK', 'NY', 10001, 'PALANI');
+    
+    ------------POPULATE TEST CENTER TABLE -------------
+    INSERTIONS.ADD_TEST_CENTER('SAINT MARY',1,1);
+    INSERTIONS.ADD_TEST_CENTER('AFC URGENT CARE',2,2);
+    INSERTIONS.ADD_TEST_CENTER('CAREWELL URGENT CARE',3,3);
+    INSERTIONS.ADD_TEST_CENTER('RITE AID',4,1);
+    INSERTIONS.ADD_TEST_CENTER('TILTON VA CLINIC',5,2);
+    INSERTIONS.ADD_TEST_CENTER('CVS',6,3);
+    
+    -------POPULATE SLOTS---------------
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 09', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 10', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 11', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 12', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 14', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 15', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 16', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 17', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 18', 'DD-MON-YY HH24'),10);
+    
+    
+    ------------POPULATE TEST TYPE TABLE -------------
+    INSERTIONS.ADD_TEST_TYPE ('COVID - PCR');
+    INSERTIONS.ADD_TEST_TYPE ('COVID - RT PCR');
+    INSERTIONS.ADD_TEST_TYPE ('COVID - ANTIGEN');
+    
+    ------------POPULATE TEST_AVAILABILITY TABLE -------------
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 1, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 2, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 3, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 4, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 5, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 6, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 7, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 8, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 9, 1);
+    
+    ------------POPULATE STAFF TIMESHEET TABLE -------------
+    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 1);
+    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 2);
+    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
+    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
+    
+    ------------POPULATE QUARANTINE FACILITY--------------------
+    INSERTIONS.ADD_QUARANTINE_FACILITY('Boston Quarantine Station',20,1,1);
+    INSERTIONS.ADD_QUARANTINE_FACILITY('CHA Cambridge Hospital',20,2,2);
+    INSERTIONS.ADD_QUARANTINE_FACILITY('Baltimore Isolation Center',20,3,3);
+    
+    ------POPULATE QUARANTINED PATIENT DETAILS----------------------
+    
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,1,sysdate+2);
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,2,sysdate+3);
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(2,3,sysdate+4);
+    
+    
+    ---------POPULATE TEST SCHEDULE-------------
+    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,2,1,'scheduled','positive');
+    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,3,2,'scheduled','positive');
+    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,4,1,'scheduled','positive');
+    
+    --------POPULATE USER_LOGIN_AUDIT------------------
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'logout',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'logout',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'logout',sysdate);
 END;
 /
 
@@ -926,11 +926,6 @@ select * from VIEW_LOCATIONS;
 select * from STAFF_VIEW;
 
 
-
-insertions.add_roles('Select STAFF_SLOTS');
-insertions.add_roles('EXECUTE STAFF_LOGIN');
-insertions.add_roles('select CENTER_RESULTS');
-insertions.add_roles('EXECUTE PUBLISH_RESULTS');
 
 
 
