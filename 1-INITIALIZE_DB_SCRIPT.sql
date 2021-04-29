@@ -149,8 +149,8 @@ BEGIN
              TEST_SLOT_ID  NUMBER(10) NOT NULL,
             CENTER_ID NUMBER(10) NOT NULL,
             TEST_TYPE_ID NUMBER(10) NOT NULL,
-            SCHEDULE_STATUS VARCHAR2(20) DEFAULT 'scheduled',
-            TEST_RESULTS VARCHAR2(20) DEFAULT 'Not Available',
+            SCHEDULE_STATUS VARCHAR2(20) DEFAULT ''scheduled'',
+            TEST_RESULTS VARCHAR2(20) DEFAULT ''Not Available'',
              CONSTRAINT TEST_SCHEDULE_PK PRIMARY KEY(TEST_SCHEDULE_ID),
             CONSTRAINT TEST_SCHEDULE_FK_USER_ID FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID),
             CONSTRAINT TEST_SCHEDULE_FK_TEST_SLOT_ID FOREIGN KEY (TEST_SLOT_ID) REFERENCES SLOTS(SLOT_ID),
@@ -218,7 +218,85 @@ DECLARE
       END LOOP;
       dbms_output.put_line( 'ALL TABLES CREATED');
       END;
-/      
+/ 
+
+CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, user_dob DATE, user_email VARCHAR, user_pwd VARCHAR, 
+        user_phone NUMBER, user_city VARCHAR, user_state VARCHAR, user_zip VARCHAR, user_emergency_contact  VARCHAR)
+    AS
+        user_id NUMBER;
+        ncount  NUMBER := 0;
+        loc_id  NUMBER(10):= 0;
+        test_results_view_sql VARCHAR(1000 char);
+    
+    BEGIN
+        SELECT
+            COUNT(*)
+        INTO ncount
+        FROM
+            users
+        WHERE
+            email = user_email;
+    
+    IF ( ncount > 0 ) THEN
+        dbms_output.put_line('User already exists.. If you are the user, then connect with your credentials and execute ALL_ACTIONS to see all availale actions.');
+    ELSE
+    
+        begin 
+        SELECT
+            location_id
+        INTO loc_id
+        FROM
+            location
+        WHERE
+            city = UPPER(user_city)
+            AND state = UPPER(user_state)
+            AND zipcode= user_zip;
+        EXCEPTION
+            WHEN no_data_found THEN
+            dbms_output.put_line('LOCATION NOT FOUND');
+        END ;
+            INSERT INTO admin.USERS ( PHONE , PWD ,EMERGENCY_CONTACT, LOCATION_ID, LAST_NAME, FIRST_NAME , DOB , JOIN_DATE, EMAIL) VALUES 
+            (user_phone, user_pwd, user_emergency_contact,loc_id, user_l_name, user_f_name, user_dob, sysdate, user_email );
+        
+    END IF;
+    COMMIT ;
+    
+    EXCEPTION
+        WHEN OTHERS THEN
+            dbms_output.put_line('ENCOUNTERED ERROR - ' || SQLERRM);
+    END SIGNUP;
+
+CREATE OR REPLACE PROCEDURE SELF_DESTRUCT
+AS
+  CURSOR config_table_cur
+  IS
+    SELECT 
+        *
+    FROM 
+        config_table;
+        
+    tab_name varchar2(50);
+    drop_sql varchar2(100);
+    row_count number(10):= 0;
+BEGIN
+  FOR i IN config_table_cur
+  LOOP
+      tab_name:= i.table_name;  
+      DBMS_OUTPUT.PUT_LINE('--------------------------');
+
+      SELECT count(*) into row_count FROM user_tables where table_name = tab_name;
+       IF(row_count > 0)
+        THEN
+            drop_sql:= 'DROP TABLE ' || tab_name || ' CASCADE CONSTRAINTS PURGE'; 
+            EXECUTE IMMEDIATE drop_sql;
+            DBMS_OUTPUT.PUT_LINE('TABLE '|| tab_name || ' DROPPED');
+         END IF;
+  END LOOP;
+  EXECUTE IMMEDIATE 'DROP TABLE CONFIG_TABLE';
+  dbms_output.put_line( 'ALL TABLES DROPPED AND PURGED');
+END SELF_DESTRUCT;
+/
+
 CREATE OR REPLACE PACKAGE INSERTIONS
     AS
         PROCEDURE ADD_LOCATION(L_CITY IN VARCHAR2, L_STATE IN VARCHAR2, L_ZIPCODE IN NUMBER);
@@ -226,8 +304,6 @@ CREATE OR REPLACE PACKAGE INSERTIONS
         PROCEDURE ADD_GROUPS(L_GROUPS_NAME IN VARCHAR2, L_GROUPS_DESCRIPTION IN VARCHAR2);
         PROCEDURE ADD_ROLES(L_ROLES_DESCRIPTION IN VARCHAR2);
         PROCEDURE ADD_GROUP_ROLES(L_GROUPS_ID IN NUMBER, L_ROLES_ID IN NUMBER);
-        PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, user_dob DATE, user_email VARCHAR, user_pwd VARCHAR, 
-            user_phone NUMBER, user_city VARCHAR, user_state VARCHAR, user_zip VARCHAR, user_emergency_contact  VARCHAR);
         PROCEDURE ADD_TEST_AVAILABILITY(L_TEST_CENTER_ID IN NUMBER, L_SLOTS_ID IN NUMBER, L_TEST_TYPE_ID IN NUMBER);
         PROCEDURE ADD_STAFF_TIMESHEET(L_USER_ID IN NUMBER, L_CENTER_ID IN NUMBER, L_SLOT_ID IN NUMBER);
         PROCEDURE ADD_QUARANTINE_FACILITY(L_QUARANTINE_FACILITY_NAME IN VARCHAR2, L_ROOMS_AVAILABILITY IN NUMBER, L_DOCTOR_ID IN NUMBER, L_LOCATION_ID IN NUMBER);
@@ -474,52 +550,6 @@ AS
             DBMS_OUTPUT.PUT_LINE(SQLERRM); 
     END ADD_TEST_SCHEDULE;
 
-    PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, user_dob DATE, user_email VARCHAR, user_pwd VARCHAR, 
-        user_phone NUMBER, user_city VARCHAR, user_state VARCHAR, user_zip VARCHAR, user_emergency_contact  VARCHAR)
-    AS
-        user_id NUMBER;
-        ncount  NUMBER := 0;
-        loc_id  NUMBER(10):= 0;
-        test_results_view_sql VARCHAR(1000 char);
-    
-    BEGIN
-        SELECT
-            COUNT(*)
-        INTO ncount
-        FROM
-            users
-        WHERE
-            email = user_email;
-    
-    IF ( ncount > 0 ) THEN
-        dbms_output.put_line('User already exists.. If you are the user, then connect with your credentials and execute ALL_ACTIONS to see all availale actions.');
-    ELSE
-    
-        begin 
-        SELECT
-            location_id
-        INTO loc_id
-        FROM
-            location
-        WHERE
-            city = UPPER(user_city)
-            AND state = UPPER(user_state)
-            AND zipcode= user_zip;
-        EXCEPTION
-            WHEN no_data_found THEN
-            dbms_output.put_line('LOCATION NOT FOUND');
-        END ;
-            INSERT INTO admin.USERS ( PHONE , PWD ,EMERGENCY_CONTACT, LOCATION_ID, LAST_NAME, FIRST_NAME , DOB , JOIN_DATE, EMAIL) VALUES 
-            (user_phone, user_pwd, user_emergency_contact,loc_id, user_l_name, user_f_name, user_dob, sysdate, user_email );
-        
-    END IF;
-    COMMIT ;
-    
-    EXCEPTION
-        WHEN OTHERS THEN
-            dbms_output.put_line('ENCOUNTERED ERROR - ' || SQLERRM);
-    END SIGNUP;
-    
     PROCEDURE ADD_TEST_AVAILABILITY(L_TEST_CENTER_ID IN NUMBER, L_SLOTS_ID IN NUMBER, L_TEST_TYPE_ID IN NUMBER)
     AS
     MERGE_STMT_SQL VARCHAR2(500);
@@ -675,6 +705,88 @@ BEGIN
 END;
 /
 
+--HELP TO NEW_CUSTOMERS
+CREATE OR REPLACE PROCEDURE SUPPORT_NEW_USER
+AS
+BEGIN
+        dbms_output.put_line('WELCOME TO COVID TEST BOOKING SYSTEM');
+        dbms_output.put_line('START BY SIGNING UP !');
+        dbms_output.put_line('EXECUTE THE BELOW PROCEDURE WITH THE SPECIFIED PARAMETERS AS FOLLOWS');
+        dbms_output.put_line('SIGNUP(FIRST_NAME, LAST_NAME, DATE_OF_BIRTH, EMAIL, PASSWORD, 
+        PHONE, CITY, STATE, ZIPCODE, EMERGENCY_CONTACT ))');
+        dbms_output.put_line('USE LOCATIONS TO CHECK VALID LOCATIONS AND PASSWORD HAS TO BE MINIMUM 12 CHARACTERS LONG');
+        dbms_output.put_line('IF YOU ARE A STAFF OR CENTER HEAD OR QUARANTINE FACILITY HEAD, PLEASE WAIT TILL ADMIN ASSSIGNS YOU REQUIRED PRIVILEGES');
+        dbms_output.put_line('AFTER LOGGING IN EXECUTE MY_ACTIONS TO SEE THE LIST OF AVAILABLE ACTIONS FOR MY USER');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        dbms_output.put_line(SQLERRM);
+        dbms_output.put_line(dbms_utility.format_error_backtrace);
+        ROLLBACK;
+END SUPPORT_NEW_USER;
+/
+
+
+--ACTIONS BASED ON ROLES
+CREATE OR REPLACE PROCEDURE MY_ACTIONS
+AS
+LOGGED_IN_USER_NAME VARCHAR2(50);
+BEGIN
+        SELECT USER INTO LOGGED_IN_USER_NAME FROM DUAL;
+        dbms_output.put_line('HELLO '|| LOGGED_IN_USER_NAME ||' ! WELCOME TO COVID TESTING SYSTEM !');
+        dbms_output.put_line('SANITIZE HANDS REGULARLY, MAINTAIN SOCIAL DISTANCE AND STAY SAFE !');
+        
+        dbms_output.put_line('AVAILABLE COMMON ACTIONS');
+        dbms_output.put_line('------------- IF YOU ARE A PUBLIC USER -------------');
+        dbms_output.put_line('1. BOOK TEST USING EXEC BOOK_TEST(CENTER_NAME, SLOT_TIME, TEST_TYPE)');
+        dbms_output.put_line('2. CANCEL TEST USING EXEC CANCEL_TEST(BOOKED SLOT_TIME)');
+        dbms_output.put_line('3. VIEW TEST RESULTS USING SELECT * FROM MY_TEST_RESULTS');
+        
+        dbms_output.put_line('------------- IF YOU ARE A STAFF_MEMBER -------------');
+        dbms_output.put_line('1. VIEW AVAILABLE SLOTS USING SELECT * FROM STAFF_SLOTS');
+        dbms_output.put_line('2. LOGIN USING STAFF_LOGIN(CENTER_NAME, SLOT_TIME)');
+        
+        dbms_output.put_line('------------- IF YOU ARE A CENTER HEAD -------------');
+        dbms_output.put_line('1. REFER TO OUR SERVICE LOCATIONS USING SELECT * FROM AVAILABLE_LOCAITONS');
+        dbms_output.put_line('2. REFER TO OUR SERVICE LOCATIONS BY STATE USING SELECT * FROM ADDRESS_STATE');
+        
+        dbms_output.put_line('------------- IF YOU ARE A QUARANTINE FACILITY HEAD -------------');
+        dbms_output.put_line('1. VIEW THE RENTAL BASIS THAT OUR SERVICE SUPPORTS USING SELECT * FROM RENTAL_BASIS ');
+        dbms_output.put_line('2. VIEW THE CATEGORIES IN WHICH WE OFFER RENTAL SERVICES USING SELECT * FROM LISTING_CATEGORY');
+        dbms_output.put_line('3. ADD A NEW LISTING USING ADD_NEW_LISTING(LISTING_TITLE varchar,LISTING_DESCRIPTION varchar,LISTING_PRICE varchar,CONTACT_INFO varchar,RENT_BASIS varchar,ITEM_CATEGORY varchar,MY_ADDRESS_ID number,START_TIME timestamp,END_TIME timestamp)');
+        dbms_output.put_line('4. REMOVE A LISTING USING REMOVE_LISTING(MY_LISTING_ID number) ');
+        dbms_output.put_line('');
+        
+        dbms_output.put_line('-------------DEALS RELATED ACTIONS-------------');
+        dbms_output.put_line('1. ');
+        dbms_output.put_line('2. VIEW THE CATEGORIES IN WHICH WE OFFER RENTAL SERVICES USING SELECT * FROM LISTING_CATEGORY');
+        dbms_output.put_line('3. ADD A NEW LISTING USING ADD_NEW_LISTING(LISTING_TITLE varchar,LISTING_DESCRIPTION varchar,LISTING_PRICE varchar,CONTACT_INFO varchar,RENT_BASIS varchar,ITEM_CATEGORY varchar,MY_ADDRESS_ID number,START_TIME timestamp,END_TIME timestamp)');
+        dbms_output.put_line('4. REMOVE A LISTING USING REMOVE_LISTING(MY_LISTING_ID number) ');
+        dbms_output.put_line('');
+        
+EXCEPTION
+    WHEN OTHERS THEN
+        dbms_output.put_line(SQLERRM);
+        dbms_output.put_line(dbms_utility.format_error_backtrace);
+        ROLLBACK;
+END ALL_ACTIONS;
+
+/
+
+CREATE OR REPLACE FUNCTION GET_LOGGEDIN_USER_ID 
+RETURN NUMBER 
+IS
+L_USER_ID NUMBER(10);
+BEGIN
+    SELECT USER_ID 
+        INTO L_USER_ID
+            FROM 
+            USERS 
+            WHERE FIRST_NAME = (SELECT USER FROM DUAL);
+    RETURN L_USER_ID;
+END;
+
+
 ---------------------------------------------------------VIEWS-------------------------------------------------
  CREATE OR REPLACE VIEW VIEW_QUARANTINE_FACILITY_DETAILS  AS
     SELECT
@@ -712,16 +824,35 @@ ORDER BY
     tc.center_name ASC;
 
 
- CREATE OR REPLACE VIEW QUARANTINE_FACILITY_HEAD_VIEW
- AS 
-            select 
-            qf.QUARANTINE_FACILITY_NAME, pu.first_name || pu.last_name AS "Name", 
-            round(pu.user_id, (sysdate - pu.join_date)) AS "NO OF DAYS IN QUARANTINE"
-            from quarantine_facility qf
-            join quarantined_patient_details qp on qf.QUARANTINE_FACILITY_ID = qp.QUARANTINE_FACILITY_ID
-            join users u on qf.doctor_id = u.user_id
-            join users pu on qp.user_id = pu.user_id
-            where  qf.doctor_id = 2;
+
+CREATE OR REPLACE VIEW TEST_DETAILS  AS 
+SELECT
+    u.first_name || u.last_name       AS "Full Name",
+    s.slot_time                       AS "TEST DATE",
+    tp.test_type                      AS "TEST TYPE",
+    ts.test_results                   AS "TEST RESULTS"
+FROM
+         users u
+    JOIN test_schedule  ts ON u.user_id = ts.user_id
+    JOIN test_type      tp ON tp.test_type_id = ts.test_type_id
+    JOIN slots          s ON ts.test_slot_id = s.slot_id
+WHERE
+    u.first_name = (select user from dual);
+
+
+
+ CREATE OR REPLACE VIEW quarantine_facility_head_view AS
+    SELECT
+        qf.quarantine_facility_name,
+        pu.first_name || pu.last_name                          AS "Name",
+        round(pu.user_id,(sysdate - pu.join_date))            AS "NO OF DAYS IN QUARANTINE"
+    FROM
+             quarantine_facility qf
+        JOIN quarantined_patient_details  qp ON qf.quarantine_facility_id = qp.quarantine_facility_id
+        JOIN users                        u ON qf.doctor_id = u.user_id
+        JOIN users                        pu ON qp.user_id = pu.user_id
+    WHERE
+        qf.doctor_id = get_loggedin_user_id;
 
  CREATE OR REPLACE VIEW TEST_STATISTICS
  AS         
@@ -734,6 +865,16 @@ ORDER BY
  JOIN LOCATION L ON TC.LOCATION_ID = L.LOCATION_ID
  GROUP BY TC.CENTER_NAME, L.CITY)
  ;
+ 
+ BEGIN 
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SIGNUP FOR ADMIN.SIGNUP';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM BOOK_TEST FOR ADMIN.BOOK_TEST';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM CANCEL_TEST FOR ADMIN.CANCEL_TEST';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SUPPORT_NEW_USER FOR ADMIN.SUPPORT_NEW_USER';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_ACTIONS FOR ADMIN.MY_ACTIONS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_TEST_RESULTS FOR ADMIN.TEST_DETAILS';
+END;
+
 
 SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
 SELECT * FROM VIEW_TEST_AVAILABILITY;
