@@ -894,10 +894,36 @@ CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS
 END;
 
 
+CREATE OR REPLACE VIEW VIEW_LOCATIONS
+AS
+select 
+CITY,STATE,ZIPCODE
+from LOCATION;
+
+ CREATE OR REPLACE VIEW STAFF_VIEW AS
+  SELECT
+    tc.center_name,
+    slot_time
+FROM
+         test_center tc
+    INNER JOIN test_availibilty  ta ON tc.center_id = ta.center_id
+    INNER JOIN slots             s ON ta.slot_id = s.slot_id
+WHERE
+        s.slots_available > 0
+    AND s.slot_time > sysdate
+GROUP BY
+    tc.center_name, 
+    slot_time
+ORDER BY
+    tc.center_name ASC;
+
+
 SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
 SELECT * FROM VIEW_TEST_AVAILABILITY;
 SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
 select * from TEST_STATISTICS;
+select * from VIEW_LOCATIONS;
+select * from STAFF_VIEW;
 
 
 
