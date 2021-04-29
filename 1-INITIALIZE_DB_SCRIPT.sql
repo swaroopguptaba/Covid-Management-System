@@ -136,7 +136,7 @@ BEGIN
             QUARANTINE_FACILITY_ID NUMBER(10) NOT NULL,  
              USER_ID NUMBER(20) NOT NULL, 
              JOIN_DATE DATE NOT NULL,
-DISCHARGE_DATE DATE
+            DISCHARGE_DATE DATE,
              CONSTRAINT QUARANTINED_PATIENT_DETAILS_PK PRIMARY KEY(QUARANTINED_PATIENT_DETAILS_ID),
             CONSTRAINT QUARANTINED_PATIENT_DETAILS_FK_FACILITY_ID FOREIGN KEY (QUARANTINE_FACILITY_ID) REFERENCES QUARANTINE_FACILITY(QUARANTINE_FACILITY_ID),
             CONSTRAINT QUARANTINED_PATIENT_DETAILS_FK_USER_ID FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID)
@@ -300,14 +300,15 @@ CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, us
             dbms_output.put_line('ENCOUNTERED ERROR - ' || SQLERRM);
     END SIGNUP;
 /
-CREATE OR REPLACE PROCEDURE SELF_DESTRUCT
+CREATE OR REPLACE PROCEDURE SELF_DESTRUCT_OBJECTS
 AS
   CURSOR config_table_cur
   IS
     SELECT 
-        *
+        OBJECT_NAME, OBJECT_TYPE
     FROM 
-        config_table;
+        USER_OBJECTS
+    ORDER BY  OBJECT_TYPE DESC;
         
     tab_name varchar2(50);
     drop_sql varchar2(100);
@@ -315,21 +316,60 @@ AS
 BEGIN
   FOR i IN config_table_cur
   LOOP
-      tab_name:= i.table_name;  
-      DBMS_OUTPUT.PUT_LINE('--------------------------');
-
-      SELECT count(*) into row_count FROM user_tables where table_name = tab_name;
-       IF(row_count > 0)
-        THEN
-            drop_sql:= 'DROP TABLE ' || tab_name || ' CASCADE CONSTRAINTS PURGE'; 
-            EXECUTE IMMEDIATE drop_sql;
-            DBMS_OUTPUT.PUT_LINE('TABLE '|| tab_name || ' DROPPED');
+        dbms_output.put_line( I.OBJECT_TYPE);
+        IF(I.OBJECT_TYPE = 'TABLE' ) THEN
+            drop_sql:= 'DROP TABLE ' || I.OBJECT_NAME || ' CASCADE CONSTRAINTS PURGE'; 
+        ELSIF (I.OBJECT_TYPE = 'VIEW') THEN 
+            drop_sql:= 'DROP VIEW ' || I.OBJECT_NAME ; 
+        ELSIF (I.OBJECT_TYPE = 'PACKAGE BODY') THEN 
+            drop_sql:= 'DROP PACKAGE BODY ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'PACKAGE') THEN 
+            drop_sql:= 'DROP PACKAGE  ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'PROCEDURE') THEN 
+            drop_sql:= 'DROP PROCEDURE  ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'FUNCTION') THEN 
+            drop_sql:= 'DROP FUNCTION  ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'SYNONYM') THEN 
+            drop_sql:= 'DROP SYNONYM  ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'TRIGGER') THEN 
+            drop_sql:= 'DROP TRIGGER  ' || I.OBJECT_NAME; 
+        ELSIF (I.OBJECT_TYPE = 'SEQUENCE') THEN 
+           CONTINUE; 
+        ELSIF (I.OBJECT_TYPE = 'INDEX') THEN 
+            CONTINUE;
          END IF;
+          EXECUTE IMMEDIATE drop_sql;
+  END LOOP;
+  dbms_output.put_line( 'SELF_DESTRUCT_OBJECTS');
+END SELF_DESTRUCT_OBJECTS;
+/
+
+CREATE OR REPLACE PROCEDURE SELF_DESTRUCT_VIEWS
+AS
+  CURSOR VIEW_CUR
+  IS
+    SELECT 
+        *
+    FROM 
+        USER_VIEWS;
+        
+    L_VIEW_NAME varchar2(50);
+BEGIN
+  FOR i IN VIEW_CUR
+  LOOP
+     
+        drop_sql:= 'DROP TABLE ' || tab_name || ' CASCADE CONSTRAINTS PURGE'; 
+        EXECUTE IMMEDIATE drop_sql;
+        DBMS_OUTPUT.PUT_LINE('TABLE '|| tab_name || ' DROPPED');
+
   END LOOP;
   EXECUTE IMMEDIATE 'DROP TABLE CONFIG_TABLE';
   dbms_output.put_line( 'ALL TABLES DROPPED AND PURGED');
-END SELF_DESTRUCT;
+END SELF_DESTRUCT_TABLES;
 /
+
+
+SELECT * FROM USER_OBJECTS;
 
 CREATE OR REPLACE PACKAGE INSERTIONS
     AS
@@ -497,19 +537,9 @@ AS
         
     PROCEDURE ADD_SLOTS(S_NAME IN VARCHAR2, S_TIME IN TIMESTAMP, S_AVAILABLE IN NUMBER)
     AS
-    MERGE_STMT_SQL VARCHAR2(500);
-    USING_STMT VARCHAR2(500);
-    BEGIN  
-        USING_STMT:= '(SELECT ' || chr(39) || S_NAME || chr(39) || ' AS SLOT_NAME, '
-                        || chr(39) || S_TIME || chr(39) || ' AS SLOT_TIME, '
-                        || S_AVAILABLE || ' AS SLOTS_AVAILABLE '
-                        || ' FROM DUAL)';
+    BEGIN 
+        EXECUTE IMMEDIATE 'INSERT INTO SLOTS (SLOT_NAME, SLOT_TIME, SLOTS_AVAILABLE) VALUES (' || S_NAME || S_TIME || S_AVAILABLE || ')';
     
-        MERGE_STMT_SQL:= 'MERGE INTO SLOTS S USING ' || USING_STMT || 'TEMP ON (S.SLOT_NAME =  TEMP.SLOT_NAME 
-                   AND S.SLOT_TIME =  TEMP.SLOT_TIME AND S.SLOTS_AVAILABLE =  TEMP.SLOTS_AVAILABLE)
-                            WHEN NOT MATCHED THEN INSERT (SLOT_NAME, SLOT_TIME, SLOTS_AVAILABLE) 
-                           VALUES (TEMP.SLOT_NAME, TEMP.SLOT_TIME, TEMP.SLOTS_AVAILABLE)';
-        EXECUTE IMMEDIATE MERGE_STMT_SQL;
         COMMIT;
         EXCEPTION
         WHEN OTHERS THEN
@@ -629,127 +659,6 @@ AS
             
      END ADD_STAFF_TIMESHEET;
 END INSERTIONS;
-/
-
-BEGIN
-    INSERTIONS.ADD_LOCATION('BOSTON','MA',02215);
-    INSERTIONS.ADD_LOCATION('NEW YORK','NY',10001);
-    INSERTIONS.ADD_LOCATION('CAMBRIDGE','MA',02114);
-    INSERTIONS.ADD_LOCATION('LOWELL','MA',01850);
-    INSERTIONS.ADD_LOCATION('SAN JOSE','CA',95119);
-    INSERTIONS.ADD_LOCATION('SAN FRANCISCO','CA',94105);
-    INSERTIONS.ADD_LOCATION('LOS ANGELES','CA',90001);
-    
-    ------------POPULATE GROUP TABLE -------------
-    insertions.add_groups('USERS','Can access USERS AND test availability table');
-    insertions.add_groups('STAFF','Can access staff timesheet');
-    insertions.add_groups('CENTER_HEAD','Can access test schedule,test center and staff timesheet');
-    insertions.add_groups('DOCTOR','Can access quarantine facitlity and quarentined patient details');
-    insertions.add_groups('ADMIN','Manages all tables');
-    
-    
-    ------------POPULATE ROLES TABLE -------------
-    insertions.add_roles('CREATE SESSION');
-    insertions.add_roles('SELECT ON LOCATION');
-    insertions.add_roles('EXECUTE ON SIGNUP');
-    insertions.add_roles('SELECT STAFF_SLOTS');
-    insertions.add_roles('EXECUTE STAFF_LOGIN');
-    insertions.add_roles('SELECT CENTER_RESULTS');
-    insertions.add_roles('EXECUTE PUBLISH_RESULTS');
-    insertions.add_roles('SELECT VIEW_QUARANTINE_FACILITY_DETAILS');
-    --insertions.add_roles('EXECUTE DISCHARGE_PATIENT');
-    ------------POPULATE GROUP ROLES TABLE -------------
-    --insertions.add_group_roles((SELECT GROUPS_ID FROM GROUPS WHERE GROUPS_NAME = 'STAFF'),1);
-    insertions.add_group_roles(1,1);
-    insertions.add_group_roles(1,2);
-    insertions.add_group_roles(1,3);
-    
-    insertions.add_group_roles(2,4);
-    insertions.add_group_roles(2,5);
-    
-    insertions.add_group_roles(3,6);
-    insertions.add_group_roles(3,7);
-    
-    insertions.add_group_roles(4,8);
-    --insertions.add_group_roles(4,9);
-    
-    ------------POPULATE USERS TABLE -------------
-    
-    SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'RAMESH');
-    SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd123456789',6174601757, 'BOSTON', 'MA', 02215, 'SURESH');
-    SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd123456789',6171234560, 'NEW YORK', 'NY', 10001, 'RAMESH');
-    SIGNUP('NEWUSER' , 'NA', TO_DATE('01-JAN-2021', 'DD-MON-YY'), 'NEWUSER@GMAIL.COM', 'SANITIZEREGULARY911',9538473966, 'BOSTON', 'MA', 02215, 'SURESH');
-    
-    ------------POPULATE TEST CENTER TABLE -------------
-    INSERTIONS.ADD_TEST_CENTER('SAINT MARY',1,1);
-    INSERTIONS.ADD_TEST_CENTER('AFC URGENT CARE',2,2);
-    INSERTIONS.ADD_TEST_CENTER('CAREWELL URGENT CARE',3,3);
-    INSERTIONS.ADD_TEST_CENTER('RITE AID',4,1);
-    INSERTIONS.ADD_TEST_CENTER('TILTON VA CLINIC',5,2);
-    INSERTIONS.ADD_TEST_CENTER('CVS',6,3);
-    
-    -------POPULATE SLOTS---------------
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 09', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 10', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 11', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 12', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 14', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 15', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 16', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 17', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 18', 'DD-MON-YY HH24'),10);
-    
-    
-    ------------POPULATE TEST TYPE TABLE -------------
-    INSERTIONS.ADD_TEST_TYPE ('COVID - PCR');
-    INSERTIONS.ADD_TEST_TYPE ('COVID - RT PCR');
-    INSERTIONS.ADD_TEST_TYPE ('COVID - ANTIGEN');
-    
-    ------------POPULATE TEST_AVAILABILITY TABLE -------------
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 1, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 2, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 3, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 4, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 5, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(1, 6, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(2, 7, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(2, 8, 1);
-    INSERTIONS.ADD_TEST_AVAILABILITY(2, 9, 1);
-    
-    ------------POPULATE STAFF TIMESHEET TABLE -------------
-    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 1);
-    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 2);
-    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
-    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
-    
-    ------------POPULATE QUARANTINE FACILITY--------------------
-    INSERTIONS.ADD_QUARANTINE_FACILITY('Boston Quarantine Station',20,1,1);
-    INSERTIONS.ADD_QUARANTINE_FACILITY('CHA Cambridge Hospital',20,2,2);
-    INSERTIONS.ADD_QUARANTINE_FACILITY('Baltimore Isolation Center',20,3,3);
-    
-    ------POPULATE QUARANTINED PATIENT DETAILS----------------------
-    
-    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,1,sysdate+2);
-    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,2,sysdate+3);
-    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(2,3,sysdate+4);
-    
-    
-    ---------POPULATE TEST SCHEDULE-------------
-    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled','negative');
-    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled','negative');
-    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled','negative');
-    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,2,1,'scheduled','positive');
-    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,3,2,'scheduled','positive');
-    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,4,1,'scheduled','positive');
-    
-    --------POPULATE USER_LOGIN_AUDIT------------------
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'login',sysdate);
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'login',sysdate);
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'login',sysdate);
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'logout',sysdate);
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'logout',sysdate);
-    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'logout',sysdate);
-END;
 /
 
 --HELP TO NEW_CUSTOMERS
@@ -892,7 +801,7 @@ AS
 
 BEGIN
 
- UPDATE QUARANTINED_PATIENT_DETAILS set discharge_date=dischargedate where qp_id=qid;
+ UPDATE QUARANTINED_PATIENT_DETAILS set discharge_date=dischargedate where quarantined_patient_details_id=qid;
 COMMIT;
 END;
 /
@@ -1013,51 +922,39 @@ ORDER BY
 /
 
 
-CREATE OR REPLACE TRIGGER logon_audit_trigger AFTER LOGON ON DATABASE DECLARE
-    login_user_id NUMBER(10);
+CREATE OR REPLACE TRIGGER logon_audit_trigger AFTER LOGON ON DATABASE 
+DECLARE
+    RISK_COUNT NUMBER(10);
 BEGIN
-    SELECT
-        user_id
-    INTO login_user_id
-    FROM
-        users
-    WHERE
-        first_name
-        = (select user from dual);
-
     INSERT INTO user_login_audit 
     (user_id, login_status, audit_date)
     VALUES (
-        login_user_id,
+        GET_LOGGEDIN_USER_ID,
         'login',
         sysdate
     );
-
+    COMMIT;
+    
+    SELECT RISK_STATUS INTO RISK_COUNT FROM USERS WHERE USER_ID = GET_LOGGEDIN_USER_ID;
+    IF (RISK_COUNT > 0) THEN
+          dbms_output.put_line("YOU MAY HAVE BEEN IN CONTACT WITH A COVID POSITIVE PERSON");
+          dbms_output.put_line("YOU ARE ADVISED TO TAKE A COVID TEST");
+    END IF;
 END;
 /
 
-CREATE OR REPLACE TRIGGER logoff_audit_trigger BEFORE LOGOFF ON DATABASE DECLARE
-    login_user_id NUMBER(10);
+CREATE OR REPLACE TRIGGER logoff_audit_trigger BEFORE LOGOFF ON DATABASE 
 BEGIN
-    SELECT
-        user_id
-    INTO login_user_id
-    FROM
-        users
-   WHERE
-        first_name
-        = (select user from dual);
-
     INSERT INTO user_login_audit 
      (user_id, login_status, audit_date)
      VALUES (
-        login_user_id,
+        GET_LOGGEDIN_USER_ID,
         'logoff',
         sysdate + 20
     );
-
+    COMMIT;
 END;
-
+/
 CREATE OR REPLACE TRIGGER assign_quarantine AFTER
     UPDATE ON test_schedule
     FOR EACH ROW
@@ -1089,7 +986,7 @@ BEGIN
     END IF;
 
 END;
-
+/
 
 CREATE OR REPLACE TRIGGER UPDATE_STAFF_RISK_STATUS AFTER
     UPDATE ON test_schedule
@@ -1115,20 +1012,155 @@ BEGIN
 
 dbms_output.put_line('UPDATE_STAFF_RISK_STATUS');
 END;
-
+/
 
  BEGIN 
-    EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SIGNUP FOR ADMIN.SIGNUP';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SIGNUP FOR ADMIN.SIGNUP';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM LOCATIONS FOR ADMIN.LOCATION';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM BOOK_TEST FOR ADMIN.BOOK_TEST';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM CANCEL_TEST FOR ADMIN.CANCEL_TEST';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SUPPORT_NEW_USER FOR ADMIN.SUPPORT_NEW_USER';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_ACTIONS FOR ADMIN.MY_ACTIONS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM VIEW_TEST_AVAILABILITY FOR ADMIN.VIEW_TEST_AVAILABILITY';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_TEST_RESULTS FOR ADMIN.TEST_DETAILS';
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_SLOTS FOR ADMIN.STAFF_SLOTS';
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_LOGIN FOR ADMIN.STAFF_LOGIN';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM VIEW_STAFF_SLOTS FOR ADMIN.STAFF_SLOTS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_LOGIN_PROC FOR ADMIN.STAFF_LOGIN';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM CENTER_RESULTS FOR ADMIN.TEST_CENTER_HEAD_VIEW';
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM PUBLISH_RESULTS FOR ADMIN.PUBLISH_RESULTS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM PUBLISH_TEST_RESULTS FOR ADMIN.PUBLISH_RESULTS'; 
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM DISCHARGE_PATIENTS FOR ADMIN.discharge_patient'; 
 END;
+
+
+
+BEGIN
+    INSERTIONS.ADD_LOCATION('BOSTON','MA',02215);
+    INSERTIONS.ADD_LOCATION('NEW YORK','NY',10001);
+    INSERTIONS.ADD_LOCATION('CAMBRIDGE','MA',02114);
+    INSERTIONS.ADD_LOCATION('LOWELL','MA',01850);
+    INSERTIONS.ADD_LOCATION('SAN JOSE','CA',95119);
+    INSERTIONS.ADD_LOCATION('SAN FRANCISCO','CA',94105);
+    INSERTIONS.ADD_LOCATION('LOS ANGELES','CA',90001);
+    
+    ------------POPULATE GROUP TABLE -------------
+    insertions.add_groups('USERS','Can access USERS AND test availability table');
+    insertions.add_groups('STAFF','Can access staff timesheet');
+    insertions.add_groups('CENTER_HEAD','Can access test schedule,test center and staff timesheet');
+    insertions.add_groups('DOCTOR','Can access quarantine facitlity and quarentined patient details');
+    insertions.add_groups('ADMIN','Manages all tables');
+    
+    
+    ------------POPULATE ROLES TABLE -------------
+    insertions.add_roles('CREATE SESSION');
+    insertions.add_roles('SELECT ON LOCATIONS');
+    insertions.add_roles('EXECUTE ANY PROCEDURE');
+    insertions.add_roles('SELECT ANY VIEW');
+    insertions.add_roles('SELECT STAFF_SLOTS');
+    insertions.add_roles('EXECUTE STAFF_LOGIN');
+    insertions.add_roles('EXECUTE INSERTIONS.ADD_SLOTS');
+    insertions.add_roles('SELECT CENTER_RESULTS');
+    insertions.add_roles('EXECUTE PUBLISH_RESULTS');
+    insertions.add_roles('SELECT VIEW_QUARANTINE_FACILITY_DETAILS');
+    insertions.add_roles('EXECUTE DISCHARGE_PATIENTS');
+    
+    ------------POPULATE GROUP ROLES TABLE -------------
+    --insertions.add_group_roles((SELECT GROUPS_ID FROM GROUPS WHERE GROUPS_NAME = 'STAFF'),1);
+    insertions.add_group_roles(1,1);
+    insertions.add_group_roles(1,2);
+    insertions.add_group_roles(1,3);
+    insertions.add_group_roles(1,4);
+    --STAFF
+    insertions.add_group_roles(2,5);
+    insertions.add_group_roles(2,6);
+    --CENTER HEAD
+    insertions.add_group_roles(3,7);
+    insertions.add_group_roles(3,8);
+    insertions.add_group_roles(3,9);
+    --QF HEAD
+    insertions.add_group_roles(4,10);
+    insertions.add_group_roles(4,11);
+    --insertions.add_group_roles(4,9);
+    
+    ------------POPULATE USERS TABLE -------------
+    
+    SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'RAMESH');
+    SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd123456789',6174601757, 'BOSTON', 'MA', 02215, 'SURESH');
+    SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd123456789',6171234560, 'NEW YORK', 'NY', 10001, 'RAMESH');
+    SIGNUP('FIRSTUSER' , 'NA', TO_DATE('01-JAN-2021', 'DD-MON-YY'), 'FIRSTUSER@GMAIL.COM', 'SantizeRegularly911',9538473966, 'BOSTON', 'MA', 02215, 'SURESH');
+    
+    ------------POPULATE TEST CENTER TABLE -------------
+    INSERTIONS.ADD_TEST_CENTER('SAINT MARY',1,1);
+    INSERTIONS.ADD_TEST_CENTER('AFC URGENT CARE',2,2);
+    INSERTIONS.ADD_TEST_CENTER('CAREWELL URGENT CARE',3,3);
+    INSERTIONS.ADD_TEST_CENTER('RITE AID',4,1);
+    INSERTIONS.ADD_TEST_CENTER('TILTON VA CLINIC',5,2);
+    INSERTIONS.ADD_TEST_CENTER('CVS',6,3);
+    
+    -------POPULATE SLOTS---------------
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 09', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 10', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 11', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 12', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 14', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 15', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 16', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 17', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 18', 'DD-MON-YY HH24'),10);
+    
+    
+    ------------POPULATE TEST TYPE TABLE -------------
+    INSERTIONS.ADD_TEST_TYPE ('COVID - PCR');
+    INSERTIONS.ADD_TEST_TYPE ('COVID - RT PCR');
+    INSERTIONS.ADD_TEST_TYPE ('COVID - ANTIGEN');
+    
+    ------------POPULATE TEST_AVAILABILITY TABLE -------------
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 1, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 2, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 3, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 4, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 5, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(1, 6, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 7, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 8, 1);
+    INSERTIONS.ADD_TEST_AVAILABILITY(2, 9, 1);
+    
+    ------------POPULATE STAFF TIMESHEET TABLE -------------
+    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 1);
+    INSERTIONS.ADD_STAFF_TIMESHEET(1, 1, 2);
+    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
+    INSERTIONS.ADD_STAFF_TIMESHEET(2, 2, 1);
+    
+    ------------POPULATE QUARANTINE FACILITY--------------------
+    INSERTIONS.ADD_QUARANTINE_FACILITY('Boston Quarantine Station',20,1,1);
+    INSERTIONS.ADD_QUARANTINE_FACILITY('CHA Cambridge Hospital',20,2,2);
+    INSERTIONS.ADD_QUARANTINE_FACILITY('Baltimore Isolation Center',20,3,3);
+    
+    ------POPULATE QUARANTINED PATIENT DETAILS----------------------
+    
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,1,sysdate+2);
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,2,sysdate+3);
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(2,3,sysdate+4);
+    
+    
+    ---------POPULATE TEST SCHEDULE-------------
+    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,1,1,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,1,1,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,2,2,'scheduled','negative');
+    INSERTIONS.ADD_TEST_SCHEDULE(1,sysdate,1,2,1,'scheduled','positive');
+    INSERTIONS.ADD_TEST_SCHEDULE(2,sysdate,2,3,2,'scheduled','positive');
+    INSERTIONS.ADD_TEST_SCHEDULE(3,sysdate,3,4,1,'scheduled','positive');
+    
+    --------POPULATE USER_LOGIN_AUDIT------------------
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'login',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(1,'logout',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(2,'logout',sysdate);
+    INSERTIONS.ADD_USER_LOGIN_AUDIT(3,'logout',sysdate);
+END;
+/
+
+
+
 
 
 --SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
@@ -1137,7 +1169,6 @@ END;
 --select * from TEST_STATISTICS;
 --select * from VIEW_LOCATIONS;
 --select * from STAFF_VIEW;
-
 
 
 
