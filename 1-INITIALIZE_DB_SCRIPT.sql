@@ -51,7 +51,7 @@ BEGIN
             , PWD VARCHAR2(20) NOT NULL 
             , EMERGENCY_CONTACT VARCHAR2(10) NOT NULL 
             , LOCATION_ID NUMBER(10) NOT NULL 
-            , RISK_STATUS INT 
+            , RISK_STATUS NUMBER DEFAULT 0
             , LAST_NAME VARCHAR2(10) 
             , FIRST_NAME VARCHAR2(10) NOT NULL 
             , DOB DATE NOT NULL 
@@ -136,6 +136,7 @@ BEGIN
             QUARANTINE_FACILITY_ID NUMBER(10) NOT NULL,  
              USER_ID NUMBER(20) NOT NULL, 
              JOIN_DATE DATE NOT NULL,
+DISCHARGE_DATE DATE
              CONSTRAINT QUARANTINED_PATIENT_DETAILS_PK PRIMARY KEY(QUARANTINED_PATIENT_DETAILS_ID),
             CONSTRAINT QUARANTINED_PATIENT_DETAILS_FK_FACILITY_ID FOREIGN KEY (QUARANTINE_FACILITY_ID) REFERENCES QUARANTINE_FACILITY(QUARANTINE_FACILITY_ID),
             CONSTRAINT QUARANTINED_PATIENT_DETAILS_FK_USER_ID FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID)
@@ -833,6 +834,8 @@ BEGIN
 END;
 /
 
+
+
 CREATE OR REPLACE PROCEDURE staff_login (
     center_name1  NUMBER,
     slot_time     VARCHAR
@@ -870,6 +873,27 @@ BEGIN
     );
 
     COMMIT;
+END;
+/
+create or replace PROCEDURE publish_result(schedule_id NUMBER, results VARCHAR)
+AS
+    
+
+BEGIN
+
+ UPDATE test_schedule set test_results=results where test_schedule_id=schedule_id;
+COMMIT;
+END;
+/
+
+create or replace PROCEDURE discharge_patient(qid NUMBER, dischargedate DATE)
+AS
+    
+
+BEGIN
+
+ UPDATE QUARANTINED_PATIENT_DETAILS set discharge_date=dischargedate where qp_id=qid;
+COMMIT;
 END;
 /
 ---------------------------------------------------------VIEWS-------------------------------------------------
