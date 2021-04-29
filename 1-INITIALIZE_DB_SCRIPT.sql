@@ -839,7 +839,21 @@ FROM
 WHERE
     u.first_name = (select user from dual);
 
-
+CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS 
+  SELECT
+        tc.center_name,
+        pu.first_name || pu.last_name AS "Name",
+        pu.user_id as "User Id", ts.test_results as "Test Result"
+    FROM
+             test_center tc
+        JOIN users          u ON tc.center_head = u.user_id
+        JOIN users          pu ON tc.center_head != pu.user_id
+        JOIN test_schedule  ts ON pu.user_id = ts.user_id
+                                 AND ts.center_id = tc.test_center_id
+        JOIN test_type      tp ON tp.test_type_id = ts.test_type_id
+        JOIN slots          s ON ts.test_slot_id = s.slot_id
+    WHERE
+        tc.center_head = get_loggedin_user_id;
 
  CREATE OR REPLACE VIEW quarantine_facility_head_view AS
     SELECT
@@ -873,6 +887,10 @@ WHERE
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SUPPORT_NEW_USER FOR ADMIN.SUPPORT_NEW_USER';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_ACTIONS FOR ADMIN.MY_ACTIONS';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_TEST_RESULTS FOR ADMIN.TEST_DETAILS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_SLOTS FOR ADMIN.STAFF_SLOTS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_LOGIN FOR ADMIN.STAFF_LOGIN';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM CENTER_RESULTS FOR ADMIN.TEST_CENTER_HEAD_VIEW';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM PUBLISH_RESULTS FOR ADMIN.PUBLISH_RESULTS';
 END;
 
 
@@ -880,6 +898,13 @@ SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
 SELECT * FROM VIEW_TEST_AVAILABILITY;
 SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
 select * from TEST_STATISTICS;
+
+
+
+insertions.add_roles('Select STAFF_SLOTS');
+insertions.add_roles('EXECUTE STAFF_LOGIN');
+insertions.add_roles('select CENTER_RESULTS');
+insertions.add_roles('EXECUTE PUBLISH_RESULTS');
 
 
 
