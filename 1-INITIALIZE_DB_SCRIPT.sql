@@ -217,9 +217,40 @@ DECLARE
              END IF;
       END LOOP;
       dbms_output.put_line( 'ALL TABLES CREATED');
-      END;
+END;
 / 
 
+create or replace PROCEDURE ASSIGN_GROUPS(U_USER_NAME VARCHAR, GROUP_NAME VARCHAR) 
+AS
+--USER_NAME VARCHAR2(100);
+ROLE_NAME varchar2(50);
+GRANT_sql varchar2(100);
+
+
+ CURSOR some_cur
+  IS
+    SELECT 
+        g.groups_name, r.roles_description
+    FROM 
+        groups g
+        join groups_roles gr on g.groups_id = gr.groups_id
+        join roles r on r.roles_id = gr.roles_id
+    where g.groups_name = UPPER(GROUP_NAME);
+
+BEGIN
+
+--SELECT FIRST_NAME INTO USER_NAME FROM USERS where FIRST_NAME = U_USER_NAME;
+
+--SELECT GROUP_NAME INTO ROLE_NAME;
+     FOR i IN some_cur
+     LOOP
+            ROLE_NAME:= I.roles_description;
+            GRANT_sql:= 'GRANT ' || ROLE_NAME || ' TO ' || U_USER_NAME;
+            dbms_output.put_line(grant_sql);
+            EXECUTE IMMEDIATE GRANT_sql;
+      END LOOP;
+END;
+/
 CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, user_dob DATE, user_email VARCHAR, user_pwd VARCHAR, 
         user_phone NUMBER, user_city VARCHAR, user_state VARCHAR, user_zip VARCHAR, user_emergency_contact  VARCHAR)
     AS
@@ -258,6 +289,8 @@ CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, us
             INSERT INTO admin.USERS ( PHONE , PWD ,EMERGENCY_CONTACT, LOCATION_ID, LAST_NAME, FIRST_NAME , DOB , JOIN_DATE, EMAIL) VALUES 
             (user_phone, user_pwd, user_emergency_contact,loc_id, user_l_name, user_f_name, user_dob, sysdate, user_email );
         
+        EXECUTE IMMEDIATE 'CREATE USER ' || user_f_name || ' IDENTIFIED BY ' || user_pwd;
+        ASSIGN_GROUPS(user_f_name, 'USERS');
     END IF;
     COMMIT ;
     
@@ -265,7 +298,7 @@ CREATE OR REPLACE PROCEDURE SIGNUP (user_f_name VARCHAR, user_l_name VARCHAR, us
         WHEN OTHERS THEN
             dbms_output.put_line('ENCOUNTERED ERROR - ' || SQLERRM);
     END SIGNUP;
-
+/
 CREATE OR REPLACE PROCEDURE SELF_DESTRUCT
 AS
   CURSOR config_table_cur
@@ -615,23 +648,36 @@ BEGIN
     
     
     ------------POPULATE ROLES TABLE -------------
+    insertions.add_roles('CREATE SESSION');
+    insertions.add_roles('SELECT ON LOCATION');
+    insertions.add_roles('EXECUTE ON SIGNUP');
     insertions.add_roles('SELECT STAFF_SLOTS');
     insertions.add_roles('EXECUTE STAFF_LOGIN');
     insertions.add_roles('SELECT CENTER_RESULTS');
     insertions.add_roles('EXECUTE PUBLISH_RESULTS');
-    
+    insertions.add_roles('SELECT VIEW_QUARANTINE_FACILITY_DETAILS');
+    --insertions.add_roles('EXECUTE DISCHARGE_PATIENT');
     ------------POPULATE GROUP ROLES TABLE -------------
     --insertions.add_group_roles((SELECT GROUPS_ID FROM GROUPS WHERE GROUPS_NAME = 'STAFF'),1);
-    insertions.add_group_roles(2,1);
-    insertions.add_group_roles(2,2);
-    insertions.add_group_roles(3,3);
-    insertions.add_group_roles(3,4);
+    insertions.add_group_roles(1,1);
+    insertions.add_group_roles(1,2);
+    insertions.add_group_roles(1,3);
+    
+    insertions.add_group_roles(2,4);
+    insertions.add_group_roles(2,5);
+    
+    insertions.add_group_roles(3,6);
+    insertions.add_group_roles(3,7);
+    
+    insertions.add_group_roles(4,8);
+    --insertions.add_group_roles(4,9);
     
     ------------POPULATE USERS TABLE -------------
     
-    INSERTIONS.SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd@123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'PALANI');
-    INSERTIONS.SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd@123456789',6174601757, 'BOSTON', 'MA', 02215, 'PALANI');
-    INSERTIONS.SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd@123456789',6171234560, 'NEW YORK', 'NY', 10001, 'PALANI');
+    SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'RAMESH');
+    SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd123456789',6174601757, 'BOSTON', 'MA', 02215, 'SURESH');
+    SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd123456789',6171234560, 'NEW YORK', 'NY', 10001, 'RAMESH');
+    SIGNUP('NEWUSER' , 'NA', TO_DATE('01-JAN-2021', 'DD-MON-YY'), 'NEWUSER@GMAIL.COM', 'SANITIZEREGULARY911',9538473966, 'BOSTON', 'MA', 02215, 'SURESH');
     
     ------------POPULATE TEST CENTER TABLE -------------
     INSERTIONS.ADD_TEST_CENTER('SAINT MARY',1,1);
@@ -642,15 +688,15 @@ BEGIN
     INSERTIONS.ADD_TEST_CENTER('CVS',6,3);
     
     -------POPULATE SLOTS---------------
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 09', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 10', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('28-APR-21 11', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 12', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 14', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('28-APR-21 15', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 16', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 17', 'DD-MON-YY HH24'),10);
-    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('28-APR-21 18', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 09', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 10', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('MORNING', TO_TIMESTAMP('30-APR-21 11', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 12', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 14', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('AFTERNOON', TO_TIMESTAMP('30-APR-21 15', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 16', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 17', 'DD-MON-YY HH24'),10);
+    INSERTIONS.ADD_SLOTS('EVENING', TO_TIMESTAMP('30-APR-21 18', 'DD-MON-YY HH24'),10);
     
     
     ------------POPULATE TEST TYPE TABLE -------------
@@ -769,7 +815,7 @@ EXCEPTION
         dbms_output.put_line(SQLERRM);
         dbms_output.put_line(dbms_utility.format_error_backtrace);
         ROLLBACK;
-END ALL_ACTIONS;
+END MY_ACTIONS;
 
 /
 
@@ -785,8 +831,47 @@ BEGIN
             WHERE FIRST_NAME = (SELECT USER FROM DUAL);
     RETURN L_USER_ID;
 END;
+/
 
+CREATE OR REPLACE PROCEDURE staff_login (
+    center_name1  NUMBER,
+    slot_time     VARCHAR
+) AS
+    cid   NUMBER;
+    ssid  NUMBER;
+BEGIN
+    SELECT
+        ts.test_center_id,
+        ta.slot_id
+    INTO
+        cid,
+        ssid
+    FROM
+             test_center ts
+        JOIN test_availability  ta ON ts.test_center_id = ta.test_center_id
+        JOIN slots              s ON ta.slot_id = s.slot_id
+    WHERE
+            s.slot_time = slot_time
+        AND ts.center_name = center_name1;
 
+    INSERT INTO staff_timesheet (
+        user_id,
+        test_center_id,
+        slot_id
+    ) VALUES (
+        (
+            SELECT
+                get_loggedin_user_id
+            FROM
+                dual
+        ),
+        cid,
+        ssid
+    );
+
+    COMMIT;
+END;
+/
 ---------------------------------------------------------VIEWS-------------------------------------------------
  CREATE OR REPLACE VIEW VIEW_QUARANTINE_FACILITY_DETAILS  AS
     SELECT
@@ -798,7 +883,7 @@ END;
     FROM
              quarantine_facility qf
         INNER JOIN location l ON qf.location_id = l.location_id;
-
+/
 CREATE OR REPLACE VIEW VIEW_TEST_AVAILABILITY  AS
     SELECT
     tc.center_name,
@@ -822,8 +907,7 @@ GROUP BY
     tt.test_type
 ORDER BY
     tc.center_name ASC;
-
-
+/
 
 CREATE OR REPLACE VIEW TEST_DETAILS  AS 
 SELECT
@@ -838,23 +922,22 @@ FROM
     JOIN slots          s ON ts.test_slot_id = s.slot_id
 WHERE
     u.first_name = (select user from dual);
-
+/
 CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS 
-  SELECT
-        tc.center_name,
+    SELECT
+        tc.center_name as "Center Name",
+        ts.test_schedule_id as "Schedule Id",
         pu.first_name || pu.last_name AS "Name",
         pu.user_id as "User Id", ts.test_results as "Test Result"
     FROM
-             test_center tc
-        JOIN users          u ON tc.center_head = u.user_id
-        JOIN users          pu ON tc.center_head != pu.user_id
-        JOIN test_schedule  ts ON pu.user_id = ts.user_id
-                                 AND ts.center_id = tc.test_center_id
+        test_center tc
+        JOIN test_schedule  ts ON ts.center_id = tc.test_center_id
+        JOIN users          pu ON pu.user_id = ts.user_id
         JOIN test_type      tp ON tp.test_type_id = ts.test_type_id
         JOIN slots          s ON ts.test_slot_id = s.slot_id
     WHERE
         tc.center_head = get_loggedin_user_id;
-
+/
  CREATE OR REPLACE VIEW quarantine_facility_head_view AS
     SELECT
         qf.quarantine_facility_name,
@@ -867,7 +950,7 @@ CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS
         JOIN users                        pu ON qp.user_id = pu.user_id
     WHERE
         qf.doctor_id = get_loggedin_user_id;
-
+/
  CREATE OR REPLACE VIEW TEST_STATISTICS
  AS         
  (
@@ -879,9 +962,139 @@ CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS
  JOIN LOCATION L ON TC.LOCATION_ID = L.LOCATION_ID
  GROUP BY TC.CENTER_NAME, L.CITY)
  ;
+ /
  
+CREATE OR REPLACE VIEW VIEW_LOCATIONS
+AS
+select 
+CITY,STATE,ZIPCODE
+from LOCATION;
+/
+ CREATE OR REPLACE VIEW STAFF_VIEW AS
+  SELECT
+    tc.center_name,
+    slot_time
+FROM
+         test_center tc
+    INNER JOIN test_availability  ta ON tc.test_center_id = ta.test_center_id
+    INNER JOIN slots             s ON ta.slot_id = s.slot_id
+WHERE
+        s.slots_available > 0
+    AND s.slot_time > sysdate
+GROUP BY
+    tc.center_name, 
+    slot_time
+ORDER BY
+    tc.center_name ASC;
+/
+
+
+CREATE OR REPLACE TRIGGER logon_audit_trigger AFTER LOGON ON DATABASE DECLARE
+    login_user_id NUMBER(10);
+BEGIN
+    SELECT
+        user_id
+    INTO login_user_id
+    FROM
+        users
+    WHERE
+        first_name
+        = (select user from dual);
+
+    INSERT INTO user_login_audit 
+    (user_id, login_status, audit_date)
+    VALUES (
+        login_user_id,
+        'login',
+        sysdate
+    );
+
+END;
+/
+
+CREATE OR REPLACE TRIGGER logoff_audit_trigger BEFORE LOGOFF ON DATABASE DECLARE
+    login_user_id NUMBER(10);
+BEGIN
+    SELECT
+        user_id
+    INTO login_user_id
+    FROM
+        users
+   WHERE
+        first_name
+        = (select user from dual);
+
+    INSERT INTO user_login_audit 
+     (user_id, login_status, audit_date)
+     VALUES (
+        login_user_id,
+        'logoff',
+        sysdate + 20
+    );
+
+END;
+
+CREATE OR REPLACE TRIGGER assign_quarantine AFTER
+    UPDATE ON test_schedule
+    FOR EACH ROW
+DECLARE
+    PRAGMA autonomous_transaction;
+    facility_id NUMBER(10);
+BEGIN
+    SELECT
+        quarantine_facility_id
+    INTO facility_id
+    FROM
+        quarantine_facility
+    WHERE
+        rooms_availability > 0
+    ORDER BY
+        rooms_availability DESC
+    FETCH FIRST 1 ROWS ONLY;
+
+    IF ( :new.test_results = 'positive' ) THEN
+        INSERT INTO quarantined_patient_details 
+        (quarantine_facility_id, user_id, join_date)
+        VALUES (
+           facility_id,
+         :old.user_id,
+            sysdate
+        );
+
+        COMMIT;
+    END IF;
+
+END;
+
+
+CREATE OR REPLACE TRIGGER UPDATE_STAFF_RISK_STATUS AFTER
+    UPDATE ON test_schedule
+FOR EACH ROW DECLARE
+    PRAGMA autonomous_transaction;
+    CURSOR staff_user_list IS
+    SELECT
+        u.user_id 
+    FROM
+             test_schedule ts
+        JOIN staff_timesheet  st ON ts.test_slot_id = st.slot_id
+        JOIN users            u ON st.user_id = u.user_id
+    WHERE
+        ts.user_id = :old.user_id;
+BEGIN
+    FOR i IN staff_user_list LOOP
+        dbms_output.put_line('--------------------------');
+        dbms_output.put_line('user id - ' || i.user_id);
+      
+            UPDATE USERS U SET RISK_STATUS = RISK_STATUS +1 WHERE U.USER_ID = I.USER_ID;
+    COMMIT;
+    END LOOP;
+
+dbms_output.put_line('UPDATE_STAFF_RISK_STATUS');
+END;
+
+
  BEGIN 
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SIGNUP FOR ADMIN.SIGNUP';
+    EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SIGNUP FOR ADMIN.SIGNUP';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM BOOK_TEST FOR ADMIN.BOOK_TEST';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM CANCEL_TEST FOR ADMIN.CANCEL_TEST';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM SUPPORT_NEW_USER FOR ADMIN.SUPPORT_NEW_USER';
@@ -894,36 +1107,12 @@ CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS
 END;
 
 
-CREATE OR REPLACE VIEW VIEW_LOCATIONS
-AS
-select 
-CITY,STATE,ZIPCODE
-from LOCATION;
-
- CREATE OR REPLACE VIEW STAFF_VIEW AS
-  SELECT
-    tc.center_name,
-    slot_time
-FROM
-         test_center tc
-    INNER JOIN test_availibilty  ta ON tc.center_id = ta.center_id
-    INNER JOIN slots             s ON ta.slot_id = s.slot_id
-WHERE
-        s.slots_available > 0
-    AND s.slot_time > sysdate
-GROUP BY
-    tc.center_name, 
-    slot_time
-ORDER BY
-    tc.center_name ASC;
-
-
-SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
-SELECT * FROM VIEW_TEST_AVAILABILITY;
-SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
-select * from TEST_STATISTICS;
-select * from VIEW_LOCATIONS;
-select * from STAFF_VIEW;
+--SELECT * FROM VIEW_QUARANTINE_FACILITY_DETAILS;
+--SELECT * FROM VIEW_TEST_AVAILABILITY;
+--SELECT * FROM QUARANTINE_FACILITY_HEAD_VIEW;
+--select * from TEST_STATISTICS;
+--select * from VIEW_LOCATIONS;
+--select * from STAFF_VIEW;
 
 
 
