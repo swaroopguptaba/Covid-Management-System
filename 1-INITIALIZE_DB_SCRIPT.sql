@@ -340,7 +340,75 @@ BEGIN
   dbms_output.put_line( 'SELF_DESTRUCT_OBJECTS');
 END SELF_DESTRUCT_OBJECTS;
 /
+create or replace PROCEDURE book_test(user_center_name VARCHAR, user_slot_time TIMESTAMP, user_test_type VARCHAR)
+AS
+  uid NUMBER;
+  cid NUMBER;
+  ssid NUMBER;
+  tid NUMBER;
 
+BEGIN
+
+  SELECT user_id into uid from users where first_name = (select user from dual);
+  SELECT test_center_id into cid from test_center where center_name = user_center_name;
+  SELECT s.slot_id into ssid from slots s join test_availability ta on s.slot_id = ta.slot_id 
+  where s.slot_time = user_slot_time and ta.test_center_id = cid;
+SELECT test_type_id into tid from test_type where test_type = user_test_type;
+
+INSERT INTO test_schedule (user_id, test_date, test_slot_id, center_id, test_type_id) VALUES (uid,sysdate,ssid,cid,tid);
+
+ UPDATE slots set slots_available=(SELECT slots_available from slots where slot_id=ssid)-1;
+COMMIT;
+EXCEPTION WHEN OTHERS
+THEN
+       dbms_output.put_line(SQLERRM);
+       ROLLBACK;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE cancel_test (
+    user_slot_time  TIMESTAMP
+) AS
+    uid   NUMBER;
+    ssid  NUMBER;
+    cid   NUMBER;
+    tid   NUMBER;
+BEGIN
+    SELECT
+        test_schedule_id,
+        s.slot_id
+    INTO
+        tid,
+        ssid
+    FROM
+        test_schedule ts
+        JOIN users             u ON ts.user_id = u.user_id
+        JOIN test_availability ta ON ts.center_id = ta.test_center_id
+        JOIN slots             s ON ta.slot_id = s.slot_id
+    WHERE
+            u.first_name = (select user from dual)
+        AND s.slot_time = user_slot_time;
+
+    UPDATE slots
+    SET
+        slots_available = (
+            SELECT
+                slots_available
+            FROM
+                slots
+            WHERE
+                slot_id = ssid
+        ) + 1;
+
+    UPDATE test_schedule ts
+    SET
+        schedule_status = 'cancelled'
+    WHERE
+        ts.test_schedule_id = tid;
+
+    COMMIT;
+END;
+/
 
 CREATE OR REPLACE PACKAGE INSERTIONS
     AS
@@ -499,7 +567,7 @@ AS
                             || chr(39) || L_JOIN_DATE || chr(39) || ' AS JOIN_DATE '
                             || ' FROM DUAL)';
             MERGE_STMT_SQL:= 'MERGE INTO QUARANTINED_PATIENT_DETAILS L USING ' || USING_STMT 
-            || 'TEMP ON (L.QUARANTINE_FACILITY_ID = TEMP.QUARANTINE_FACILITY_ID ) 
+            || 'TEMP ON (L.QUARANTINE_FACILITY_ID = TEMP.QUARANTINE_FACILITY_ID AND L.USER_ID = TEMP.USER_ID AND L.JOIN_DATE = TEMP.JOIN_DATE) 
             WHEN NOT MATCHED THEN INSERT (QUARANTINE_FACILITY_ID, USER_ID, JOIN_DATE) VALUES (TEMP.QUARANTINE_FACILITY_ID, TEMP.USER_ID, TEMP.JOIN_DATE)';
             EXECUTE IMMEDIATE MERGE_STMT_SQL;
             COMMIT;
@@ -676,7 +744,7 @@ BEGIN
         
         dbms_output.put_line('AVAILABLE COMMON ACTIONS');
         dbms_output.put_line('------------- IF YOU ARE A PUBLIC USER -------------');
-        dbms_output.put_line('1. VIEW TEST aAVILABILITY USING SELECT * FROM VIEW_TEST_AVAILABILITY');
+        dbms_output.put_line('1. VIEW TEST AVILABILITY USING SELECT * FROM VIEW_TEST_AVAILABILITY');
         dbms_output.put_line('2. BOOK TEST USING EXEC BOOK_TEST(CENTER_NAME, SLOT_TIME, TEST_TYPE)');
         dbms_output.put_line('3. CANCEL TEST USING EXEC CANCEL_TEST(BOOKED SLOT_TIME)');
         dbms_output.put_line('4. VIEW TEST RESULTS USING SELECT * FROM MY_TEST_RESULTS');
@@ -721,7 +789,7 @@ END;
 
 CREATE OR REPLACE PROCEDURE staff_login (
     center_name1  NUMBER,
-    slot_time     VARCHAR
+    slot_time     DATE
 ) AS
     cid   NUMBER;
     ssid  NUMBER;
@@ -856,7 +924,8 @@ CREATE OR REPLACE  VIEW TEST_CENTER_HEAD_VIEW AS
         JOIN users                        u ON qf.doctor_id = u.user_id
         JOIN users                        pu ON qp.user_id = pu.user_id
     WHERE
-        qf.doctor_id = get_loggedin_user_id;
+        qf.doctor_id = get_loggedin_user_id
+        and qp.discharge_date is null;
 /
  CREATE OR REPLACE VIEW TEST_STATISTICS
  AS         
@@ -997,11 +1066,11 @@ END;
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_ACTIONS FOR ADMIN.MY_ACTIONS';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM VIEW_TEST_AVAILABILITY FOR ADMIN.VIEW_TEST_AVAILABILITY';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE PUBLIC SYNONYM MY_TEST_RESULTS FOR ADMIN.TEST_DETAILS';
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM VIEW_STAFF_SLOTS FOR ADMIN.STAFF_SLOTS';
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM VIEW_STAFF_SLOTS FOR ADMIN.STAFF_VIEW';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM STAFF_LOGIN_PROC FOR ADMIN.STAFF_LOGIN';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM CENTER_RESULTS FOR ADMIN.TEST_CENTER_HEAD_VIEW';
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM PUBLISH_TEST_RESULTS FOR ADMIN.PUBLISH_RESULTS'; 
-     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM MY_QUARANTINE_FACILITY_DETAILS FOR ADMIN.VIEW_QUARANTINE_FACILITY_DETAILS'; 
+     EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM MY_QUARANTINE_FACILITY_DETAILS FOR ADMIN.QUARANTINE_FACILITY_HEAD_VIEW'; 
      EXECUTE IMMEDIATE 'CREATE OR REPLACE SYNONYM DISCHARGE_PATIENTS FOR ADMIN.discharge_patient'; 
 END;
 /
@@ -1031,13 +1100,13 @@ BEGIN
     insertions.add_roles('SELECT ON  VIEW_TEST_AVAILABILITY');
     insertions.add_roles('SELECT ON  MY_TEST_RESULTS');
     
-    insertions.add_roles('SELECT ON ADMIN.STAFF_SLOTS');
-    insertions.add_roles('EXECUTE ON ADMIN.STAFF_LOGIN');
+    insertions.add_roles('SELECT ON ADMIN.VIEW_STAFF_SLOTS');
+    insertions.add_roles('EXECUTE ON ADMIN.STAFF_LOGIN_PROC');
 
     insertions.add_roles('SELECT ON ADMIN.CENTER_RESULTS');
     insertions.add_roles('EXECUTE ON ADMIN.PUBLISH_RESULTS');
     
-    insertions.add_roles('SELECT ON ADMIN.VIEW_QUARANTINE_FACILITY_DETAILS');
+    insertions.add_roles('SELECT ON ADMIN.MY_QUARANTINE_FACILITY_DETAILS');
     insertions.add_roles('EXECUTE ON ADMIN.DISCHARGE_PATIENTS');
     
     ------------POPULATE GROUP ROLES TABLE -------------
@@ -1059,7 +1128,7 @@ BEGIN
     
     ------------POPULATE USERS TABLE -------------
     
-    SIGNUP('SWAROOP' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOP@GMAIL.COM', 'Mypwd123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'RAMESH');
+    SIGNUP('SWAROOPG' , 'GUPTA', TO_DATE('12-NOV-1994', 'DD-MON-YY'), 'BA.SWAROOPG@GMAIL.COM', 'Mypwd123456789',6178589411, 'SAN JOSE', 'CA', 95119, 'RAMESH');
     SIGNUP('SHREYAS' , 'RAMESH', TO_DATE('17-NOV-1996', 'DD-MON-YY'), 'SHREYAS@GMAIL.COM', 'Mypwd123456789',6174601757, 'BOSTON', 'MA', 02215, 'SURESH');
     SIGNUP('APOORVA' , 'K', TO_DATE('1-JAN-1997', 'DD-MON-YY'), 'APOORVA@GMAIL.COM', 'Mypwd123456789',6171234560, 'NEW YORK', 'NY', 10001, 'RAMESH');
     SIGNUP('FIRSTUSER' , 'NA', TO_DATE('01-JAN-2021', 'DD-MON-YY'), 'FIRSTUSER@GMAIL.COM', 'SantizeRegularly911',9538473966, 'BOSTON', 'MA', 02215, 'SURESH');
@@ -1116,6 +1185,7 @@ BEGIN
     INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,1,sysdate+2);
     INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(1,2,sysdate+3);
     INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(2,3,sysdate+4);
+    INSERTIONS.ADD_QUARANTINED_PATIENT_DETAILS(3,2,sysdate+4);
     
     
     ---------POPULATE TEST SCHEDULE-------------
@@ -1143,3 +1213,6 @@ END;
 --select * from TEST_STATISTICS;
 --select * from VIEW_LOCATIONS;
 --select * from STAFF_VIEW;
+
+grant selet on 
+select * from users;
